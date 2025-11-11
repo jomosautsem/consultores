@@ -78,6 +78,7 @@ interface AppContextType {
   adminUsers: AdminUsersState;
   messages: Message[];
   loading: boolean;
+  error: string | null;
   login: (email: string, pass: string) => Promise<{ success: boolean, reason?: string }>;
   clientLogin: (email: string, pass: string) => Promise<{ success: boolean, reason?: string }>;
   logout: () => void;
@@ -106,6 +107,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [adminUsers, setAdminUsers] = useState<AdminUsersState>({});
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch all data from Supabase on initial load
   useEffect(() => {
@@ -132,8 +134,13 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         setMessages((messagesRes.data || []).map(messageFromSupabase));
 
-      } catch (error) {
-        console.error("Error fetching initial data:", error);
+      } catch (err: any) {
+        console.error("Error fetching initial data:", err);
+        if (err.message && (err.message.includes('JWT') || err.message.includes('Unauthorized'))) {
+          setError('Error de conexión con la base de datos. Verifique que la API Key de Supabase sea correcta.');
+        } else {
+            setError('No se pudo cargar la información. Verifique la conexión y las políticas de seguridad (RLS) de su base de datos.');
+        }
       } finally {
         setLoading(false);
       }
@@ -200,7 +207,10 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
     if (error) {
         console.error("Error adding client:", error);
-        return { success: false, reason: 'Error en la base de datos.' };
+        const reason = error.message.includes('violates row-level security policy') 
+            ? 'Error de permisos. Revise las políticas de seguridad (RLS) en su base de datos.'
+            : 'Error en la base de datos.';
+        return { success: false, reason };
     }
     
     setClients(prevClients => [clientFromSupabase(data), ...prevClients]);
@@ -234,7 +244,10 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     
     if (error) {
         console.error("Error updating client:", error);
-        return { success: false, reason: 'Error en la base de datos.' };
+        const reason = error.message.includes('violates row-level security policy') 
+            ? 'Error de permisos. Revise las políticas de seguridad (RLS) en su base de datos.'
+            : 'Error en la base de datos.';
+        return { success: false, reason };
     }
     setClients(prevClients => prevClients.map(c => c.id === updatedClient.id ? clientFromSupabase(data) : c));
     return { success: true };
@@ -346,7 +359,10 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     
     if (error) {
         console.error("Error adding admin user:", error);
-        return { success: false, reason: 'Error en la base de datos.' };
+        const reason = error.message.includes('violates row-level security policy') 
+            ? 'Error de permisos. Revise las políticas de seguridad (RLS) en su base de datos.'
+            : 'Error en la base de datos.';
+        return { success: false, reason };
     }
 
     const { email: newEmail, details } = adminUserFromSupabase(data);
@@ -362,6 +378,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     adminUsers,
     messages,
     loading,
+    error,
     login,
     clientLogin,
     logout,
@@ -381,7 +398,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const AppContent: React.FC = () => {
-  const { loading, currentUser, currentClient } = useAppContext();
+  const { loading, currentUser, currentClient, error } = useAppContext();
 
   if (loading) {
     return (
@@ -392,6 +409,24 @@ const AppContent: React.FC = () => {
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
           <p className="mt-4 text-slate-400">Conectando con la base de datos...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-red-50 text-red-800 p-4">
+        <div className="text-center max-w-2xl bg-white p-8 rounded-lg shadow-lg border border-red-200">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          <h2 className="text-2xl font-bold mb-2">Error de Conexión</h2>
+          <p className="text-red-700">{error}</p>
+          <p className="mt-4 text-sm text-slate-500">
+            Esto puede deberse a una clave de API incorrecta o a políticas de seguridad (RLS) que bloquean el acceso.
+            Por favor, revise la configuración de su proyecto Supabase y asegúrese de que la aplicación tenga los permisos necesarios.
+          </p>
         </div>
       </div>
     );
