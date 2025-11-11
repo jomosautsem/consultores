@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../App';
 import { UserRole, Client, SatStatus, Message } from '../types';
@@ -85,6 +86,26 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                 admin: { ...prev.admin, [name]: files[0].name }
             }));
         }
+    };
+
+    // Placeholder functions for file actions
+    const handleDownload = (fileName: string) => {
+        // In a real app, this would fetch from Supabase Storage
+        console.log(`Simulating download for: ${fileName}`);
+        const link = document.createElement('a');
+        link.href = `data:application/octet-stream;base64,U2ltdWxhY2nDs24gZGUgYXJjaGl2byB6aXAu`; // Dummy zip content
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleViewPdf = (fileName: string) => {
+        // In a real app, this would get a signed URL from Supabase Storage and open it
+        console.log(`Simulating view for: ${fileName}`);
+        // Using a placeholder PDF URL for demonstration
+        const pdfUrl = `https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf`;
+        window.open(pdfUrl, '_blank');
     };
     
     const handleSubmit = async (e: React.FormEvent) => {
@@ -197,10 +218,18 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                                         <input id="eFirma" name="eFirma" type="file" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".zip" />
                                     )}
                                     {isEditing && clientData.eFirma && (
-                                        <p className="text-xs text-slate-500 mt-1">
-                                            Archivo actual: {clientData.eFirma}
-                                            {!canEdit && <span className="text-slate-400"> (solo vista)</span>}
-                                        </p>
+                                        <div className="text-xs text-slate-500 mt-2 p-2 bg-slate-50 rounded-md">
+                                            <div className="flex justify-between items-center">
+                                                <span>Archivo actual: <strong>{clientData.eFirma}</strong></span>
+                                                {canEdit ? (
+                                                    <div className="flex items-center space-x-2">
+                                                        <button type="button" onClick={() => handleDownload(clientData.eFirma!)} className="text-emerald-600 hover:text-emerald-800 font-semibold text-xs">Descargar</button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs">(solo vista)</span>
+                                                )}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                                 <div className="space-y-1 col-span-1 md:col-span-2">
@@ -209,10 +238,20 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                                         <input id="csf" name="csf" type="file" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".pdf" />
                                     )}
                                     {isEditing && clientData.csf && (
-                                        <p className="text-xs text-slate-500 mt-1">
-                                            Archivo actual: {clientData.csf}
-                                            {!canEdit && <span className="text-slate-400"> (solo vista)</span>}
-                                        </p>
+                                       <div className="text-xs text-slate-500 mt-2 p-2 bg-slate-50 rounded-md">
+                                            <div className="flex justify-between items-center">
+                                                <span>Archivo actual: <strong>{clientData.csf}</strong></span>
+                                                {canEdit ? (
+                                                    <div className="flex items-center space-x-2">
+                                                        <button type="button" onClick={() => handleViewPdf(clientData.csf!)} className="text-blue-600 hover:text-blue-800 font-semibold text-xs">Visualizar</button>
+                                                        <span className="text-slate-300">|</span>
+                                                        <button type="button" onClick={() => handleDownload(clientData.csf!)} className="text-emerald-600 hover:text-emerald-800 font-semibold text-xs">Descargar</button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs">(solo vista)</span>
+                                                )}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -232,10 +271,18 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                                         <input id="adminEFirma" name="eFirma" type="file" onChange={handleAdminFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".zip" />
                                     )}
                                     {isEditing && clientData.admin.eFirma && (
-                                        <p className="text-xs text-slate-500 mt-1">
-                                            Archivo actual: {clientData.admin.eFirma}
-                                            {!canEdit && <span className="text-slate-400"> (solo vista)</span>}
-                                        </p>
+                                        <div className="text-xs text-slate-500 mt-2 p-2 bg-slate-50 rounded-md">
+                                            <div className="flex justify-between items-center">
+                                                <span>Archivo actual: <strong>{clientData.admin.eFirma}</strong></span>
+                                                {canEdit ? (
+                                                    <div className="flex items-center space-x-2">
+                                                        <button type="button" onClick={() => handleDownload(clientData.admin.eFirma!)} className="text-emerald-600 hover:text-emerald-800 font-semibold text-xs">Descargar</button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs">(solo vista)</span>
+                                                )}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                                 <div className="space-y-1 col-span-1 md:col-span-3">
@@ -244,10 +291,20 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                                         <input id="adminCsf" name="csf" type="file" onChange={handleAdminFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".pdf" />
                                     )}
                                     {isEditing && clientData.admin.csf && (
-                                        <p className="text-xs text-slate-500 mt-1">
-                                            Archivo actual: {clientData.admin.csf}
-                                            {!canEdit && <span className="text-slate-400"> (solo vista)</span>}
-                                        </p>
+                                        <div className="text-xs text-slate-500 mt-2 p-2 bg-slate-50 rounded-md">
+                                            <div className="flex justify-between items-center">
+                                                <span>Archivo actual: <strong>{clientData.admin.csf}</strong></span>
+                                                {canEdit ? (
+                                                    <div className="flex items-center space-x-2">
+                                                        <button type="button" onClick={() => handleViewPdf(clientData.admin.csf!)} className="text-blue-600 hover:text-blue-800 font-semibold text-xs">Visualizar</button>
+                                                        <span className="text-slate-300">|</span>
+                                                        <button type="button" onClick={() => handleDownload(clientData.admin.csf!)} className="text-emerald-600 hover:text-emerald-800 font-semibold text-xs">Descargar</button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs">(solo vista)</span>
+                                                )}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             </div>
