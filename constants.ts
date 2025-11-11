@@ -1,9 +1,9 @@
 import { User, UserRole, Client, SatStatus, Message } from './types';
 
-export const ADMIN_USERS: Record<string, Omit<User, 'email'>> = {
-  'adminuno@gmail.com': { role: UserRole.LEVEL_1, isActive: true },
-  'admindos@gmail.com': { role: UserRole.LEVEL_2, isActive: true },
-  'admintres@gmail.com': { role: UserRole.LEVEL_3, isActive: true },
+export const ADMIN_USERS: Record<string, { role: UserRole; isActive: boolean; password?: string; }> = {
+  'adminuno@gmail.com': { role: UserRole.LEVEL_1, isActive: true, password: '123456' },
+  'admindos@gmail.com': { role: UserRole.LEVEL_2, isActive: true, password: '123456' },
+  'admintres@gmail.com': { role: UserRole.LEVEL_3, isActive: true, password: '123456' },
 };
 
 export const MOCK_CLIENTS: Client[] = [

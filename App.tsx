@@ -6,7 +6,7 @@ import LoginScreen from './components/LoginScreen';
 import DashboardScreen from './components/DashboardScreen';
 import ClientDashboardScreen from './components/ClientDashboardScreen';
 
-type AdminUsersState = Record<string, Omit<User, 'email'>>;
+type AdminUsersState = Record<string, { role: UserRole, isActive: boolean, password?: string }>;
 
 interface AppContextType {
   currentUser: User | null;
@@ -22,6 +22,7 @@ interface AppContextType {
   sendMessage: (clientId: string, content: string) => void;
   toggleAdminStatus: (email: string) => void;
   toggleClientStatus: (clientId: string) => void;
+  addAdminUser: (email: string, role: UserRole, password: string) => { success: boolean; reason?: string };
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -45,7 +46,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const trimmedEmail = email.trim().toLowerCase();
     const userDetails = adminUsers[trimmedEmail];
     
-    if (userDetails && pass === '123456') {
+    if (userDetails && userDetails.password === pass) {
       if (!userDetails.isActive) {
         return { success: false, reason: 'Su cuenta ha sido desactivada.' };
       }
@@ -145,6 +146,30 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     );
   }, []);
 
+  const addAdminUser = useCallback((email: string, role: UserRole, password: string): { success: boolean; reason?: string } => {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
+        return { success: false, reason: 'El correo no puede estar vacío.' };
+    }
+     if (!password) {
+        return { success: false, reason: 'La contraseña no puede estar vacía.' };
+    }
+    if (adminUsers[trimmedEmail] || clients.some(c => c.email.toLowerCase() === trimmedEmail)) {
+        return { success: false, reason: 'Este correo electrónico ya está en uso.' };
+    }
+
+    setAdminUsers(prev => ({
+        ...prev,
+        [trimmedEmail]: {
+            role,
+            isActive: true,
+            password,
+        }
+    }));
+
+    return { success: true };
+  }, [adminUsers, clients]);
+
   const contextValue = {
     currentUser,
     currentClient,
@@ -159,6 +184,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     sendMessage,
     toggleAdminStatus,
     toggleClientStatus,
+    addAdminUser,
   };
   
   const renderContent = () => {

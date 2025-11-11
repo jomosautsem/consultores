@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../App';
 import { UserRole, Client, SatStatus, Message } from '../types';
@@ -290,8 +289,106 @@ const ToggleSwitch: React.FC<{ checked: boolean; onChange: () => void, disabled?
 };
 
 
+const AddAdminForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+    const { addAdminUser } = useAppContext();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [role, setRole] = useState<UserRole>(UserRole.LEVEL_1);
+    const [error, setError] = useState('');
+    const [showSuccess, setShowSuccess] = useState(false);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        if (!email || !password) {
+            setError('Todos los campos son obligatorios.');
+            return;
+        }
+
+        const result = addAdminUser(email, role, password);
+
+        if (result.success) {
+            setShowSuccess(true);
+            setTimeout(() => {
+                onClose();
+            }, 2000);
+        } else {
+            setError(result.reason || 'No se pudo agregar al administrador.');
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-30">
+            <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold text-slate-800">Nuevo Administrador</h2>
+                    <button onClick={onClose} className="text-slate-500 hover:text-slate-800"><XMarkIcon /></button>
+                </div>
+                {showSuccess ? (
+                    <div className="text-center p-4">
+                        <div className="mx-auto bg-emerald-100 rounded-full h-16 w-16 flex items-center justify-center">
+                            <svg className="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 mt-4">¡Administrador Agregado!</h3>
+                        <p className="text-slate-600 mt-2">La cuenta ha sido creada con éxito.</p>
+                    </div>
+                ) : (
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label htmlFor="admin-email" className="block text-sm font-medium text-slate-700">Correo Electrónico</label>
+                            <input
+                                id="admin-email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
+                                placeholder="nuevo.admin@gmail.com"
+                                required
+                            />
+                        </div>
+                         <div>
+                            <label htmlFor="admin-password"  className="block text-sm font-medium text-slate-700">Crear Contraseña</label>
+                            <input
+                                id="admin-password"
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
+                                placeholder="••••••••"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="admin-role" className="block text-sm font-medium text-slate-700">Rol de Administrador</label>
+                            <select
+                                id="admin-role"
+                                value={role}
+                                onChange={(e) => setRole(e.target.value as UserRole)}
+                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm rounded-md"
+                            >
+                                <option value={UserRole.LEVEL_1}>Nivel 1 (Solo alta y vista de nombres)</option>
+                                <option value={UserRole.LEVEL_2}>Nivel 2 (Alta y vista de documentos)</option>
+                            </select>
+                        </div>
+                        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                        <div className="flex justify-end pt-2">
+                             <button type="submit" className="bg-emerald-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-emerald-700 transition duration-300">
+                                Crear Administrador
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </div>
+        </div>
+    );
+};
+
+
 const UserManagement: React.FC = () => {
     const { adminUsers, clients, toggleAdminStatus, toggleClientStatus, currentUser } = useAppContext();
+    const [showAddAdminForm, setShowAddAdminForm] = useState(false);
 
     const getRoleName = (role: UserRole) => {
         if (role === UserRole.LEVEL_1) return 'Nivel 1';
@@ -301,47 +398,55 @@ const UserManagement: React.FC = () => {
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-                <h3 className="text-2xl font-bold text-slate-800 mb-4">Administradores</h3>
-                <ul className="divide-y divide-slate-200">
-                    {/* FIX: Use Object.keys().map() to avoid type inference issues with Object.entries() */}
-                    {Object.keys(adminUsers).map((email) => {
-                        const user = adminUsers[email];
-                        return (
-                            <li key={email} className="py-4 flex items-center justify-between">
+        <>
+            {showAddAdminForm && <AddAdminForm onClose={() => setShowAddAdminForm(false)} />}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white p-6 rounded-lg shadow-lg">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-2xl font-bold text-slate-800">Administradores</h3>
+                         <button onClick={() => setShowAddAdminForm(true)} className="flex items-center bg-emerald-100 text-emerald-800 font-semibold py-1 px-3 rounded-lg hover:bg-emerald-200 transition duration-300 text-sm">
+                            <PlusIcon className="w-4 h-4 mr-1"/>
+                            Agregar
+                        </button>
+                    </div>
+                    <ul className="divide-y divide-slate-200">
+                        {Object.keys(adminUsers).map((email) => {
+                            const user = adminUsers[email];
+                            return (
+                                <li key={email} className="py-4 flex items-center justify-between">
+                                    <div>
+                                        <p className="font-semibold text-slate-800">{email}</p>
+                                        <p className="text-sm text-slate-500">Rol: {getRoleName(user.role)}</p>
+                                    </div>
+                                    <ToggleSwitch
+                                        checked={user.isActive}
+                                        onChange={() => toggleAdminStatus(email)}
+                                        disabled={email === currentUser?.email}
+                                    />
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+                <div className="bg-white p-6 rounded-lg shadow-lg">
+                    <h3 className="text-2xl font-bold text-slate-800 mb-4">Clientes</h3>
+                    <ul className="divide-y divide-slate-200">
+                        {clients.map(client => (
+                             <li key={client.id} className="py-4 flex items-center justify-between">
                                 <div>
-                                    <p className="font-semibold text-slate-800">{email}</p>
-                                    <p className="text-sm text-slate-500">Rol: {getRoleName(user.role)}</p>
+                                    <p className="font-semibold text-slate-800">{client.companyName}</p>
+                                    <p className="text-sm text-slate-500">{client.email}</p>
                                 </div>
-                                <ToggleSwitch
-                                    checked={user.isActive}
-                                    onChange={() => toggleAdminStatus(email)}
-                                    disabled={email === currentUser?.email}
+                                <ToggleSwitch 
+                                    checked={client.isActive} 
+                                    onChange={() => toggleClientStatus(client.id)}
                                 />
                             </li>
-                        );
-                    })}
-                </ul>
+                        ))}
+                    </ul>
+                </div>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-                <h3 className="text-2xl font-bold text-slate-800 mb-4">Clientes</h3>
-                <ul className="divide-y divide-slate-200">
-                    {clients.map(client => (
-                         <li key={client.id} className="py-4 flex items-center justify-between">
-                            <div>
-                                <p className="font-semibold text-slate-800">{client.companyName}</p>
-                                <p className="text-sm text-slate-500">{client.email}</p>
-                            </div>
-                            <ToggleSwitch 
-                                checked={client.isActive} 
-                                onChange={() => toggleClientStatus(client.id)}
-                            />
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        </div>
+        </>
     );
 };
 
