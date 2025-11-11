@@ -635,7 +635,7 @@ export default function DashboardScreen() {
             case 'list':
                 return <ClientList onSelectClient={handleSelectClient} />;
             case 'messages':
-                return currentUser?.role === UserRole.LEVEL_3 ? <MessagesInbox /> : <ClientList onSelectClient={handleSelectClient} />;
+                return (currentUser?.role === UserRole.LEVEL_2 || currentUser?.role === UserRole.LEVEL_3) ? <MessagesInbox /> : <ClientList onSelectClient={handleSelectClient} />;
             case 'management':
                 return currentUser?.role === UserRole.LEVEL_3 ? <UserManagement /> : <ClientList onSelectClient={handleSelectClient} />;
             case 'form':
@@ -660,17 +660,17 @@ export default function DashboardScreen() {
                         </p>
                     </div>
                      <div className="flex items-center space-x-2 mt-4 sm:mt-0">
+                        {(currentUser?.role === UserRole.LEVEL_2 || currentUser?.role === UserRole.LEVEL_3) && (
+                            <button onClick={() => handleViewChange('messages')} className={`flex items-center font-bold py-2 px-4 rounded-lg transition duration-300 border ${view === 'messages' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-600 hover:bg-slate-50 border-emerald-600'}`}>
+                                <InboxIcon className="w-5 h-5 mr-2"/>
+                                Mensajes
+                            </button>
+                        )}
                         {currentUser?.role === UserRole.LEVEL_3 && (
-                            <>
-                                <button onClick={() => handleViewChange('messages')} className={`flex items-center font-bold py-2 px-4 rounded-lg transition duration-300 border ${view === 'messages' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-600 hover:bg-slate-50 border-emerald-600'}`}>
-                                    <InboxIcon className="w-5 h-5 mr-2"/>
-                                    Mensajes
-                                </button>
-                                <button onClick={() => handleViewChange('management')} className={`flex items-center font-bold py-2 px-4 rounded-lg transition duration-300 border ${view === 'management' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-600 hover:bg-slate-50 border-emerald-600'}`}>
-                                    <UsersIcon className="w-5 h-5 mr-2"/>
-                                    Gestionar Accesos
-                                </button>
-                            </>
+                            <button onClick={() => handleViewChange('management')} className={`flex items-center font-bold py-2 px-4 rounded-lg transition duration-300 border ${view === 'management' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-600 hover:bg-slate-50 border-emerald-600'}`}>
+                                <UsersIcon className="w-5 h-5 mr-2"/>
+                                Gestionar Accesos
+                            </button>
                         )}
                         <button onClick={handleAddNew} className="flex items-center bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 transition duration-300 shadow-lg">
                             <PlusIcon className="w-5 h-5 mr-2"/>
