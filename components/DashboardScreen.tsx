@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../App';
 import { UserRole, Client, SatStatus, Message } from '../types';
@@ -330,7 +331,6 @@ const ToggleSwitch: React.FC<{ checked: boolean; onChange: () => void, disabled?
 const AddAdminForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { addAdminUser } = useAppContext();
     const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
     const [role, setRole] = useState<UserRole>(UserRole.LEVEL_1);
     const [error, setError] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
@@ -338,12 +338,13 @@ const AddAdminForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        if (!email || !password) {
-            setError('Todos los campos son obligatorios.');
+        if (!email) {
+            setError('El correo electrónico es obligatorio.');
             return;
         }
 
-        const result = await addAdminUser(email, role, password);
+        // The password is intentionally omitted as it's now handled by Supabase Auth
+        const result = await addAdminUser(email, role, '');
 
         if (result.success) {
             setShowSuccess(true);
@@ -351,7 +352,7 @@ const AddAdminForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 onClose();
             }, 2000);
         } else {
-            setError(result.reason || 'No se pudo agregar al administrador.');
+            setError(result.reason || 'No se pudo agregar el perfil del administrador.');
         }
     };
 
@@ -359,7 +360,7 @@ const AddAdminForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-30">
             <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-slate-800">Nuevo Administrador</h2>
+                    <h2 className="text-2xl font-bold text-slate-800">Nuevo Perfil de Administrador</h2>
                     <button onClick={onClose} className="text-slate-500 hover:text-slate-800"><XMarkIcon /></button>
                 </div>
                 {showSuccess ? (
@@ -369,11 +370,15 @@ const AddAdminForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 mt-4">¡Administrador Agregado!</h3>
-                        <p className="text-slate-600 mt-2">La cuenta ha sido creada con éxito.</p>
+                        <h3 className="text-xl font-bold text-slate-800 mt-4">¡Perfil Creado!</h3>
+                        <p className="text-slate-600 mt-2">El perfil del administrador ha sido agregado.</p>
                     </div>
                 ) : (
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 text-sm" role="alert">
+                            <p className="font-bold">Proceso de 2 Pasos</p>
+                            <p>1. Cree el perfil aquí con su rol. <br/> 2. Luego, cree el usuario con el mismo email y una contraseña en el panel de <strong>Supabase Auth</strong>.</p>
+                        </div>
                         <div>
                             <label htmlFor="admin-email" className="block text-sm font-medium text-slate-700">Correo Electrónico</label>
                             <input
@@ -383,18 +388,6 @@ const AddAdminForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
                                 placeholder="nuevo.admin@gmail.com"
-                                required
-                            />
-                        </div>
-                         <div>
-                            <label htmlFor="admin-password"  className="block text-sm font-medium text-slate-700">Crear Contraseña</label>
-                            <input
-                                id="admin-password"
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
-                                placeholder="••••••••"
                                 required
                             />
                         </div>
@@ -413,7 +406,7 @@ const AddAdminForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
                         <div className="flex justify-end pt-2">
                              <button type="submit" className="bg-emerald-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-emerald-700 transition duration-300">
-                                Crear Administrador
+                                Crear Perfil
                             </button>
                         </div>
                     </form>

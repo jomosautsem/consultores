@@ -1,7 +1,6 @@
 
-
 import React, { useState, useCallback, useContext, createContext, useEffect } from 'react';
-import type { User, Client, Message, ClientAdmin } from './types';
+import type { User, Client, Message } from './types';
 import { UserRole, SatStatus } from './types';
 import LoginScreen from './components/LoginScreen';
 import DashboardScreen from './components/DashboardScreen';
@@ -51,15 +50,6 @@ const clientToSupabase = (client: Omit<Client, 'id' | 'satStatus' | 'isActive'> 
     ...('isActive' in client && { is_active: client.isActive }),
 });
 
-const adminUserFromSupabase = (dbAdmin: any): { email: string; details: { role: UserRole; isActive: boolean; password?: string } } => ({
-  email: dbAdmin.email,
-  details: {
-    role: dbAdmin.role,
-    isActive: dbAdmin.is_active,
-    password: dbAdmin.password,
-  },
-});
-
 const messageFromSupabase = (dbMessage: any): Message => ({
     id: dbMessage.id,
     clientId: dbMessage.client_id,
@@ -68,8 +58,7 @@ const messageFromSupabase = (dbMessage: any): Message => ({
     timestamp: dbMessage.timestamp,
 });
 
-
-type AdminUsersState = Record<string, { role: UserRole, isActive: boolean, password?: string }>;
+type AdminUsersState = Record<string, { role: UserRole, isActive: boolean }>;
 
 interface AppContextType {
   currentUser: User | null;
@@ -109,91 +98,153 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch all data from Supabase on initial load
+  // Manages Supabase Auth state, which is the source of truth for admin logins
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [clientsRes, adminsRes, messagesRes] = await Promise.all([
-          supabase.from('clients').select('*'),
-          supabase.from('administrators').select('*'),
-          supabase.from('messages').select('*').order('timestamp', { ascending: true })
-        ]);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setLoading(true);
+      if (session?.user) {
+        // User is logged in via Supabase Auth. Fetch their role from our custom administrators table.
+        const { data: adminDetails, error: profileError } = await supabase
+          .from('administrators')
+          .select('role, is_active')
+          .eq('email', session.user.email)
+          .single();
 
-        if (clientsRes.error) throw clientsRes.error;
-        if (adminsRes.error) throw adminsRes.error;
-        if (messagesRes.error) throw messagesRes.error;
-
-        setClients((clientsRes.data || []).map(clientFromSupabase));
-        
-        const adminsObject = (adminsRes.data || []).reduce((acc, admin) => {
-            const { email, details } = adminUserFromSupabase(admin);
-            acc[email] = details;
-            return acc;
-        }, {} as AdminUsersState);
-        setAdminUsers(adminsObject);
-
-        setMessages((messagesRes.data || []).map(messageFromSupabase));
-
-      } catch (err: any) {
-        console.error("Error fetching initial data:", err);
-        if (err.message && (err.message.includes('JWT') || err.message.includes('Unauthorized'))) {
-          setError('Error de conexión con la base de datos. Verifique que la API Key de Supabase sea correcta.');
+        if (profileError) {
+           console.error("Error fetching admin profile:", profileError);
+           setError("No se pudo cargar el perfil del administrador.");
+           await supabase.auth.signOut();
+           setCurrentUser(null);
+        } else if (adminDetails) {
+          if (!adminDetails.is_active) {
+            // User is authenticated but their profile is disabled in our system.
+            await supabase.auth.signOut();
+            setCurrentUser(null);
+            // We could set an error here to inform the user.
+          } else {
+            setCurrentUser({
+              email: session.user.email!,
+              role: adminDetails.role as UserRole,
+              isActive: adminDetails.is_active,
+            });
+          }
         } else {
-            setError('No se pudo cargar la información. Verifique la conexión y las políticas de seguridad (RLS) de su base de datos.');
+            // This is an inconsistent state: user exists in Supabase Auth but not in our administrators table.
+            // For security, we log them out.
+            await supabase.auth.signOut();
+            setCurrentUser(null);
         }
-      } finally {
-        setLoading(false);
+      } else {
+        // No session, so no admin user is logged in.
+        setCurrentUser(null);
       }
-    };
-    fetchData();
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+  
+  // Fetch data for the dashboard once an admin is authenticated
+  useEffect(() => {
+      const fetchDataForAdmin = async () => {
+          if (!currentUser) {
+              setClients([]);
+              setMessages([]);
+              setAdminUsers({});
+              return;
+          };
+
+          try {
+              setLoading(true);
+              const [clientsRes, adminsRes, messagesRes] = await Promise.all([
+                  supabase.from('clients').select('*'),
+                  supabase.from('administrators').select('email, role, is_active'),
+                  supabase.from('messages').select('*').order('timestamp', { ascending: true })
+              ]);
+
+              if (clientsRes.error) throw clientsRes.error;
+              if (adminsRes.error) throw adminsRes.error;
+              if (messagesRes.error) throw messagesRes.error;
+
+              setClients((clientsRes.data || []).map(clientFromSupabase));
+              
+              const adminsObject = (adminsRes.data || []).reduce((acc, admin) => {
+                  acc[admin.email] = { role: admin.role, isActive: admin.is_active };
+                  return acc;
+              }, {} as AdminUsersState);
+              setAdminUsers(adminsObject);
+
+              setMessages((messagesRes.data || []).map(messageFromSupabase));
+          } catch (err: any) {
+              console.error("Error fetching admin data:", err);
+              setError('No se pudo cargar la información del panel de control. Verifique las políticas de seguridad (RLS).');
+          } finally {
+              setLoading(false);
+          }
+      };
+
+      fetchDataForAdmin();
+  }, [currentUser]);
 
   const login = useCallback(async (email: string, pass: string): Promise<{ success: boolean, reason?: string }> => {
-    const trimmedEmail = email.trim().toLowerCase();
-    const userDetails = adminUsers[trimmedEmail];
+    // Uses Supabase's built-in, secure authentication.
+    const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: pass,
+    });
     
-    // NOTE: This checks against state because we've already fetched all admins.
-    // For higher security, a direct DB call is better.
-    if (userDetails && userDetails.password === pass) {
-      if (!userDetails.isActive) {
-        return { success: false, reason: 'Su cuenta ha sido desactivada.' };
-      }
-      setCurrentUser({ email: trimmedEmail, role: userDetails.role, isActive: userDetails.isActive });
-      setCurrentClient(null);
-      return { success: true };
+    if (error) {
+        console.error("Supabase login error:", error.message);
+        if (error.message.includes('Invalid login credentials')) {
+            return { success: false, reason: 'Correo electrónico o contraseña inválidos.' };
+        }
+        return { success: false, reason: 'Ocurrió un error al iniciar sesión.' };
     }
-    return { success: false, reason: 'Correo electrónico o contraseña inválidos.' };
-  }, [adminUsers]);
+    
+    // onAuthStateChange will handle setting the user state.
+    return { success: true };
+  }, []);
 
   const clientLogin = useCallback(async (email: string, pass: string): Promise<{ success: boolean, reason?: string }> => {
     const trimmedEmail = email.trim().toLowerCase();
     
-    // NOTE: This checks against state. For larger datasets, a direct DB call is better.
-    const client = clients.find(c => c.email.toLowerCase() === trimmedEmail && c.password === pass);
-    if (client) {
-      if (!client.isActive) {
-          return { success: false, reason: 'Su cuenta ha sido desactivada.' };
-      }
-      setCurrentClient(client);
-      setCurrentUser(null);
-      return { success: true };
+    // Direct database query for client login.
+    // NOTE: This requires the 'clients' table to have a public RLS policy for SELECT.
+    const { data: client, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('email', trimmedEmail)
+        .single();
+    
+    if (error || !client) {
+        console.error("Client login error:", error);
+        return { success: false, reason: 'Correo electrónico o contraseña inválidos.' };
     }
-    return { success: false, reason: 'Correo electrónico o contraseña inválidos.' };
-  }, [clients]);
 
-  const logout = useCallback(() => {
+    if (client.password === pass) {
+        if (!client.is_active) {
+            return { success: false, reason: 'Su cuenta ha sido desactivada.' };
+        }
+        setCurrentClient(clientFromSupabase(client));
+        setCurrentUser(null);
+        return { success: true };
+    }
+    
+    return { success: false, reason: 'Correo electrónico o contraseña inválidos.' };
+  }, []);
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setCurrentUser(null);
     setCurrentClient(null);
   }, []);
 
   const addClient = useCallback(async (clientData: Omit<Client, 'id' | 'satStatus' | 'isActive'>): Promise<{ success: boolean; reason?: string }> => {
-    const trimmedEmail = clientData.email.trim().toLowerCase();
-    if (clients.some(c => c.email.toLowerCase() === trimmedEmail)) {
+    const existingClients = await supabase.from('clients').select('email, rfc');
+    if (existingClients.data?.some(c => c.email.toLowerCase() === clientData.email.trim().toLowerCase())) {
         return { success: false, reason: 'Este correo electrónico ya está en uso.' };
     }
-
-    const trimmedRfc = clientData.rfc.trim().toUpperCase();
-    if (clients.some(c => c.rfc.toUpperCase() === trimmedRfc)) {
+    if (existingClients.data?.some(c => c.rfc.toUpperCase() === clientData.rfc.trim().toUpperCase())) {
         return { success: false, reason: 'Este RFC ya está registrado.' };
     }
 
@@ -230,7 +281,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       -----------------------
     `);
     return { success: true };
-  }, [clients]);
+  }, []);
 
   const updateClient = useCallback(async (updatedClient: Client): Promise<{ success: boolean; reason?: string }> => {
     const supabaseClient = clientToSupabase(updatedClient);
@@ -343,18 +394,19 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const addAdminUser = useCallback(async (email: string, role: UserRole, password: string): Promise<{ success: boolean; reason?: string }> => {
     const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail || !password) {
-        return { success: false, reason: 'Todos los campos son obligatorios.' };
+    if (!trimmedEmail) {
+        return { success: false, reason: 'El correo es obligatorio.' };
     }
     if (adminUsers[trimmedEmail] || clients.some(c => c.email.toLowerCase() === trimmedEmail)) {
         return { success: false, reason: 'Este correo electrónico ya está en uso.' };
     }
 
-    // WARNING: Storing passwords in plain text is insecure. Use a hashing algorithm like bcrypt in production.
+    // IMPORTANT: Admin users must now be created in the Supabase Auth dashboard.
+    // This function only creates their profile in the 'administrators' table.
     const { data, error } = await supabase
         .from('administrators')
-        .insert({ email: trimmedEmail, role, password, is_active: true })
-        .select()
+        .insert({ email: trimmedEmail, role, is_active: true })
+        .select('email, role, is_active')
         .single();
     
     if (error) {
@@ -365,8 +417,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         return { success: false, reason };
     }
 
-    const { email: newEmail, details } = adminUserFromSupabase(data);
-    setAdminUsers(prev => ({ ...prev, [newEmail]: details }));
+    setAdminUsers(prev => ({ ...prev, [data.email]: { role: data.role, isActive: data.is_active } }));
 
     return { success: true };
   }, [adminUsers, clients]);
@@ -408,7 +459,7 @@ const AppContent: React.FC = () => {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <p className="mt-4 text-slate-400">Conectando con la base de datos...</p>
+          <p className="mt-4 text-slate-400">Verificando sesión...</p>
         </div>
       </div>
     );
@@ -421,11 +472,11 @@ const AppContent: React.FC = () => {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-          <h2 className="text-2xl font-bold mb-2">Error de Conexión</h2>
+          <h2 className="text-2xl font-bold mb-2">Error de Aplicación</h2>
           <p className="text-red-700">{error}</p>
           <p className="mt-4 text-sm text-slate-500">
-            Esto puede deberse a una clave de API incorrecta o a políticas de seguridad (RLS) que bloquean el acceso.
-            Por favor, revise la configuración de su proyecto Supabase y asegúrese de que la aplicación tenga los permisos necesarios.
+            Ocurrió un error al cargar los datos. Por favor, recargue la página.
+            Si el problema persiste, contacte al soporte.
           </p>
         </div>
       </div>
