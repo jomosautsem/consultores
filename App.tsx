@@ -1,10 +1,71 @@
-import React, { useState, useCallback, useContext, createContext } from 'react';
-import type { User, Client, Message } from './types';
+import React, { useState, useCallback, useContext, createContext, useEffect } from 'react';
+import type { User, Client, Message, ClientAdmin } from './types';
 import { UserRole, SatStatus } from './types';
-import { ADMIN_USERS, MOCK_CLIENTS, MOCK_MESSAGES } from './constants';
 import LoginScreen from './components/LoginScreen';
 import DashboardScreen from './components/DashboardScreen';
 import ClientDashboardScreen from './components/ClientDashboardScreen';
+import { supabase } from './supabaseClient';
+
+// --- Data Mapping Helpers ---
+// Transforms data from Supabase (snake_case) to frontend format (camelCase)
+const clientFromSupabase = (dbClient: any): Client => ({
+  id: dbClient.id,
+  companyName: dbClient.company_name,
+  legalName: dbClient.legal_name,
+  location: dbClient.location,
+  email: dbClient.email,
+  phone: dbClient.phone,
+  rfc: dbClient.rfc,
+  eFirma: dbClient.e_firma_filename,
+  csf: dbClient.csf_filename,
+  password: dbClient.password,
+  satStatus: dbClient.sat_status,
+  isActive: dbClient.is_active,
+  admin: {
+    firstName: dbClient.contact_admin_first_name,
+    paternalLastName: dbClient.contact_admin_paternal_last_name,
+    maternalLastName: dbClient.contact_admin_maternal_last_name,
+    phone: dbClient.contact_admin_phone,
+  },
+});
+
+// Transforms data from frontend format to Supabase format for inserts/updates
+const clientToSupabase = (client: Omit<Client, 'id' | 'satStatus' | 'isActive'> | Client) => ({
+    company_name: client.companyName,
+    legal_name: client.legalName,
+    location: client.location,
+    email: client.email,
+    phone: client.phone,
+    rfc: client.rfc,
+    e_firma_filename: client.eFirma,
+    csf_filename: client.csf,
+    password: client.password,
+    contact_admin_first_name: client.admin.firstName,
+    contact_admin_paternal_last_name: client.admin.paternalLastName,
+    contact_admin_maternal_last_name: client.admin.maternalLastName,
+    contact_admin_phone: client.admin.phone,
+    // Include status and active state if they exist on the object (for updates)
+    ...('satStatus' in client && { sat_status: client.satStatus }),
+    ...('isActive' in client && { is_active: client.isActive }),
+});
+
+const adminUserFromSupabase = (dbAdmin: any): { email: string; details: { role: UserRole; isActive: boolean; password?: string } } => ({
+  email: dbAdmin.email,
+  details: {
+    role: dbAdmin.role,
+    isActive: dbAdmin.is_active,
+    password: dbAdmin.password,
+  },
+});
+
+const messageFromSupabase = (dbMessage: any): Message => ({
+    id: dbMessage.id,
+    clientId: dbMessage.client_id,
+    sender: dbMessage.sender,
+    content: dbMessage.content,
+    timestamp: dbMessage.timestamp,
+});
+
 
 type AdminUsersState = Record<string, { role: UserRole, isActive: boolean, password?: string }>;
 
@@ -14,15 +75,15 @@ interface AppContextType {
   clients: Client[];
   adminUsers: AdminUsersState;
   messages: Message[];
-  login: (email: string, pass: string) => { success: boolean, reason?: string };
-  clientLogin: (email: string, pass: string) => { success: boolean, reason?: string };
+  login: (email: string, pass: string) => Promise<{ success: boolean, reason?: string }>;
+  clientLogin: (email: string, pass: string) => Promise<{ success: boolean, reason?: string }>;
   logout: () => void;
-  addClient: (client: Omit<Client, 'id' | 'satStatus' | 'isActive'>) => void;
-  updateClient: (client: Client) => void;
-  sendMessage: (clientId: string, content: string) => void;
-  toggleAdminStatus: (email: string) => void;
-  toggleClientStatus: (clientId: string) => void;
-  addAdminUser: (email: string, role: UserRole, password: string) => { success: boolean; reason?: string };
+  addClient: (client: Omit<Client, 'id' | 'satStatus' | 'isActive'>) => Promise<void>;
+  updateClient: (client: Client) => Promise<void>;
+  sendMessage: (clientId: string, content: string) => Promise<void>;
+  toggleAdminStatus: (email: string) => Promise<void>;
+  toggleClientStatus: (clientId: string) => Promise<void>;
+  addAdminUser: (email: string, role: UserRole, password: string) => Promise<{ success: boolean; reason?: string }>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -38,14 +99,51 @@ export const useAppContext = () => {
 const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
-  const [clients, setClients] = useState<Client[]>(MOCK_CLIENTS);
-  const [adminUsers, setAdminUsers] = useState<AdminUsersState>(ADMIN_USERS);
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUsersState>({});
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const login = useCallback((email: string, pass: string): { success: boolean, reason?: string } => {
+  // Fetch all data from Supabase on initial load
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [clientsRes, adminsRes, messagesRes] = await Promise.all([
+          supabase.from('clients').select('*'),
+          supabase.from('administrators').select('*'),
+          supabase.from('messages').select('*').order('timestamp', { ascending: true })
+        ]);
+
+        if (clientsRes.error) throw clientsRes.error;
+        if (adminsRes.error) throw adminsRes.error;
+        if (messagesRes.error) throw messagesRes.error;
+
+        setClients(clientsRes.data.map(clientFromSupabase));
+        
+        const adminsObject = adminsRes.data.reduce((acc, admin) => {
+            const { email, details } = adminUserFromSupabase(admin);
+            acc[email] = details;
+            return acc;
+        }, {} as AdminUsersState);
+        setAdminUsers(adminsObject);
+
+        setMessages(messagesRes.data.map(messageFromSupabase));
+
+      } catch (error) {
+        console.error("Error fetching initial data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const login = useCallback(async (email: string, pass: string): Promise<{ success: boolean, reason?: string }> => {
     const trimmedEmail = email.trim().toLowerCase();
     const userDetails = adminUsers[trimmedEmail];
     
+    // NOTE: This checks against state because we've already fetched all admins.
+    // For higher security, a direct DB call is better.
     if (userDetails && userDetails.password === pass) {
       if (!userDetails.isActive) {
         return { success: false, reason: 'Su cuenta ha sido desactivada.' };
@@ -57,8 +155,10 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return { success: false, reason: 'Correo electrónico o contraseña inválidos.' };
   }, [adminUsers]);
 
-  const clientLogin = useCallback((email: string, pass: string): { success: boolean, reason?: string } => {
+  const clientLogin = useCallback(async (email: string, pass: string): Promise<{ success: boolean, reason?: string }> => {
     const trimmedEmail = email.trim().toLowerCase();
+    
+    // NOTE: This checks against state. For larger datasets, a direct DB call is better.
     const client = clients.find(c => c.email.toLowerCase() === trimmedEmail && c.password === pass);
     if (client) {
       if (!client.isActive) {
@@ -76,27 +176,31 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setCurrentClient(null);
   }, []);
 
-  const addClient = useCallback((clientData: Omit<Client, 'id' | 'satStatus' | 'isActive'>) => {
-    const newClient: Client = {
-      ...clientData,
-      id: `cl-${Date.now()}`,
-      satStatus: SatStatus.PENDIENTE,
-      isActive: true,
-    };
-    setClients(prevClients => [newClient, ...prevClients]);
+  const addClient = useCallback(async (clientData: Omit<Client, 'id' | 'satStatus' | 'isActive'>) => {
+    const supabaseClient = clientToSupabase(clientData);
+    
+    const { data, error } = await supabase
+      .from('clients')
+      .insert({ ...supabaseClient, sat_status: SatStatus.PENDIENTE, is_active: true })
+      .select()
+      .single();
+
+    if (error) {
+        console.error("Error adding client:", error);
+        return;
+    }
+    
+    setClients(prevClients => [clientFromSupabase(data), ...prevClients]);
     
     console.log(`
       --- SIMULATING EMAIL ---
-      To: ${newClient.email}
+      To: ${data.email}
       Subject: ¡Bienvenido a Grupo Kali Consultores!
 
-      Hola ${newClient.admin.firstName},
-
-      Le confirmamos el alta de su empresa "${newClient.companyName}" con nosotros.
-      
-      Puede acceder a su portal de cliente en nuestro sitio web con las siguientes credenciales:
-      Usuario: ${newClient.email}
-      Contraseña: ${newClient.password}
+      Hola ${data.contact_admin_first_name},
+      Le confirmamos el alta de su empresa "${data.company_name}" con nosotros.
+      Puede acceder a su portal de cliente con:
+      Usuario: ${data.email} | Contraseña: ${data.password}
 
       Atentamente,
       Grupo Kali Consultores
@@ -104,68 +208,130 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     `);
   }, []);
 
-  const updateClient = useCallback((updatedClient: Client) => {
-    setClients(prevClients => prevClients.map(c => c.id === updatedClient.id ? updatedClient : c));
+  const updateClient = useCallback(async (updatedClient: Client) => {
+    const supabaseClient = clientToSupabase(updatedClient);
+    
+    const { data, error } = await supabase
+        .from('clients')
+        .update(supabaseClient)
+        .eq('id', updatedClient.id)
+        .select()
+        .single();
+    
+    if (error) {
+        console.error("Error updating client:", error);
+        return;
+    }
+    setClients(prevClients => prevClients.map(c => c.id === updatedClient.id ? clientFromSupabase(data) : c));
   }, []);
 
-  const sendMessage = useCallback((clientId: string, content: string) => {
-    const newMessage: Message = {
-        id: `msg-${Date.now()}`,
-        clientId,
+  const sendMessage = useCallback(async (clientId: string, content: string) => {
+    const newMessagePayload = {
+        client_id: clientId,
         content,
-        sender: 'client',
-        timestamp: new Date().toISOString()
+        sender: 'client' as const
     };
-    setMessages(prev => [...prev, newMessage]);
+
+    const { data, error } = await supabase
+        .from('messages')
+        .insert(newMessagePayload)
+        .select()
+        .single();
     
-    setTimeout(() => {
-        const adminReply: Message = {
-            id: `msg-${Date.now() + 1}`,
-            clientId,
+    if (error) {
+        console.error("Error sending message:", error);
+        return;
+    }
+
+    setMessages(prev => [...prev, messageFromSupabase(data)]);
+    
+    setTimeout(async () => {
+        const adminReplyPayload = {
+            client_id: clientId,
             content: "Recibido. Nuestro equipo revisará su mensaje y le contactará a la brevedad.",
-            sender: 'admin',
-            timestamp: new Date().toISOString()
+            sender: 'admin' as const
         };
-        setMessages(prev => [...prev, adminReply]);
+        const { data: replyData, error: replyError } = await supabase
+            .from('messages')
+            .insert(adminReplyPayload)
+            .select()
+            .single();
+
+        if (replyError) {
+            console.error("Error sending admin reply:", replyError);
+            return;
+        }
+        setMessages(prev => [...prev, messageFromSupabase(replyData)]);
     }, 2000);
   }, []);
 
-  const toggleAdminStatus = useCallback((email: string) => {
+  const toggleAdminStatus = useCallback(async (email: string) => {
+    const user = adminUsers[email];
+    if (!user) return;
+    const newStatus = !user.isActive;
+
+    const { error } = await supabase
+        .from('administrators')
+        .update({ is_active: newStatus })
+        .eq('email', email);
+
+    if (error) {
+        console.error("Error toggling admin status:", error);
+        return;
+    }
+    
     setAdminUsers(prevAdmins => {
         const newAdmins = { ...prevAdmins };
         if (newAdmins[email]) {
-            newAdmins[email] = { ...newAdmins[email], isActive: !newAdmins[email].isActive };
+            newAdmins[email] = { ...newAdmins[email], isActive: newStatus };
         }
         return newAdmins;
     });
-  }, []);
+  }, [adminUsers]);
 
-  const toggleClientStatus = useCallback((clientId: string) => {
-    setClients(prevClients => 
-        prevClients.map(c => c.id === clientId ? { ...c, isActive: !c.isActive } : c)
-    );
-  }, []);
+  const toggleClientStatus = useCallback(async (clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return;
+    const newStatus = !client.isActive;
 
-  const addAdminUser = useCallback((email: string, role: UserRole, password: string): { success: boolean; reason?: string } => {
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail) {
-        return { success: false, reason: 'El correo no puede estar vacío.' };
+    const { error } = await supabase
+        .from('clients')
+        .update({ is_active: newStatus })
+        .eq('id', clientId);
+    
+    if (error) {
+        console.error("Error toggling client status:", error);
+        return;
     }
-     if (!password) {
-        return { success: false, reason: 'La contraseña no puede estar vacía.' };
+    
+    setClients(prevClients => 
+        prevClients.map(c => c.id === clientId ? { ...c, isActive: newStatus } : c)
+    );
+  }, [clients]);
+
+  const addAdminUser = useCallback(async (email: string, role: UserRole, password: string): Promise<{ success: boolean; reason?: string }> => {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !password) {
+        return { success: false, reason: 'Todos los campos son obligatorios.' };
     }
     if (adminUsers[trimmedEmail] || clients.some(c => c.email.toLowerCase() === trimmedEmail)) {
         return { success: false, reason: 'Este correo electrónico ya está en uso.' };
     }
 
-    setAdminUsers(prev => ({
-        ...prev,
-        [trimmedEmail]: {
-            role,
-            isActive: true,
-            password,
-        }
-    }));
+    // WARNING: Storing passwords in plain text is insecure. Use a hashing algorithm like bcrypt in production.
+    const { data, error } = await supabase
+        .from('administrators')
+        .insert({ email: trimmedEmail, role, password, is_active: true })
+        .select()
+        .single();
+    
+    if (error) {
+        console.error("Error adding admin user:", error);
+        return { success: false, reason: 'Error en la base de datos.' };
+    }
+
+    const { email: newEmail, details } = adminUserFromSupabase(data);
+    setAdminUsers(prev => ({ ...prev, [newEmail]: details }));
 
     return { success: true };
   }, [adminUsers, clients]);
@@ -188,6 +354,19 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   };
   
   const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-100">
+          <div className="flex flex-col items-center">
+            <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="mt-4 text-slate-600">Conectando con la base de datos...</p>
+          </div>
+        </div>
+      );
+    }
     if (currentUser) return <DashboardScreen />;
     if (currentClient) return <ClientDashboardScreen />;
     return <LoginScreen />;
