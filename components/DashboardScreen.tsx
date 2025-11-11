@@ -78,6 +78,32 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
         e.preventDefault();
         setError('');
         
+        // Manual validation
+        const { companyName, legalName, location, email, phone, rfc, eFirma, csf, password, admin } = clientData;
+        const requiredFields = { companyName, legalName, location, email, phone, rfc, adminFirstName: admin.firstName, adminPaternalLastName: admin.paternalLastName, adminMaternalLastName: admin.maternalLastName, adminPhone: admin.phone };
+
+        for (const value of Object.values(requiredFields)) {
+            if (!value || !value.trim()) {
+                setError('Por favor, complete todos los campos obligatorios.');
+                return;
+            }
+        }
+
+        if (!isEditing) {
+            if (!password || !password.trim()) {
+                setError('Por favor, cree una contraseña para el cliente.');
+                return;
+            }
+            if (!eFirma) {
+                setError('Por favor, adjunte la Firma Electrónica (.zip).');
+                return;
+            }
+            if (!csf) {
+                setError('Por favor, adjunte la Constancia de Situación Fiscal (.pdf).');
+                return;
+            }
+        }
+        
         let result: { success: boolean; reason?: string };
 
         if (isEditing && clientToEdit) {
@@ -118,13 +144,13 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                         <div className="mb-6 p-4 border border-slate-200 rounded-md">
                             <h3 className="text-lg font-semibold text-emerald-700 mb-4">Datos de la Empresa</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <input name="companyName" value={clientData.companyName} onChange={handleChange} placeholder="Nombre de la Empresa" className="p-2 border rounded" disabled={isEditing && !canEdit} required/>
-                                <input name="legalName" value={clientData.legalName} onChange={handleChange} placeholder="Razón Social" className="p-2 border rounded" disabled={isEditing && !canEdit} required/>
-                                <input name="location" value={clientData.location} onChange={handleChange} placeholder="Ubicación" className="p-2 border rounded col-span-1 md:col-span-2" disabled={isEditing && !canEdit} required/>
-                                <input name="email" type="email" value={clientData.email} onChange={handleChange} placeholder="Correo Electrónico" className="p-2 border rounded" disabled={isEditing && !canEdit} required/>
-                                <input name="phone" type="tel" value={clientData.phone} onChange={handleChange} placeholder="Número Telefónico" className="p-2 border rounded" disabled={isEditing && !canEdit} required/>
+                                <input name="companyName" value={clientData.companyName} onChange={handleChange} placeholder="Nombre de la Empresa" className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                <input name="legalName" value={clientData.legalName} onChange={handleChange} placeholder="Razón Social" className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                <input name="location" value={clientData.location} onChange={handleChange} placeholder="Ubicación" className="p-2 border rounded col-span-1 md:col-span-2" disabled={isEditing && !canEdit} />
+                                <input name="email" type="email" value={clientData.email} onChange={handleChange} placeholder="Correo Electrónico" className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                <input name="phone" type="tel" value={clientData.phone} onChange={handleChange} placeholder="Número Telefónico" className="p-2 border rounded" disabled={isEditing && !canEdit} />
                                 {!isEditing && (
-                                     <input name="password" type="password" value={clientData.password || ''} onChange={handleChange} placeholder="Crear Contraseña para Cliente" className="p-2 border rounded" required/>
+                                     <input name="password" type="password" value={clientData.password || ''} onChange={handleChange} placeholder="Crear Contraseña para Cliente" className="p-2 border rounded" />
                                 )}
                                 {isEditing && canEdit && (
                                      <div className="col-span-1 md:col-span-2">
@@ -142,16 +168,16 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                         <div className="mb-6 p-4 border border-slate-200 rounded-md">
                             <h3 className="text-lg font-semibold text-emerald-700 mb-4">Documentos Fiscales</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <input name="rfc" value={clientData.rfc} onChange={handleChange} placeholder="RFC Razón Social" className="p-2 border rounded" disabled={isEditing && !canEdit} required/>
+                                <input name="rfc" value={clientData.rfc} onChange={handleChange} placeholder="RFC Razón Social" className="p-2 border rounded" disabled={isEditing && !canEdit} />
                                 
                                 <div className="space-y-1">
                                     <label htmlFor="eFirma" className="block text-sm font-medium text-slate-600">Firma Electrónica (.zip)</label>
-                                    <input id="eFirma" name="eFirma" type="file" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".zip" disabled={isEditing && !canEdit} required={!isEditing} />
+                                    <input id="eFirma" name="eFirma" type="file" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".zip" disabled={isEditing && !canEdit} />
                                     {isEditing && clientData.eFirma && <p className="text-xs text-slate-500 mt-1">Archivo actual: {clientData.eFirma}</p>}
                                 </div>
                                 <div className="space-y-1 col-span-1 md:col-span-2">
                                     <label htmlFor="csf" className="block text-sm font-medium text-slate-600">Constancia de Situación Fiscal (.pdf)</label>
-                                    <input id="csf" name="csf" type="file" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".pdf" disabled={isEditing && !canEdit} required={!isEditing} />
+                                    <input id="csf" name="csf" type="file" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".pdf" disabled={isEditing && !canEdit} />
                                     {isEditing && clientData.csf && <p className="text-xs text-slate-500 mt-1">Archivo actual: {clientData.csf}</p>}
                                 </div>
                             </div>
@@ -160,10 +186,10 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                         <div className="mb-6 p-4 border border-slate-200 rounded-md">
                              <h3 className="text-lg font-semibold text-emerald-700 mb-4">Datos del Administrador</h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <input name="firstName" value={clientData.admin.firstName} onChange={e => handleChange(e, 'admin')} placeholder="Nombre(s)" className="p-2 border rounded" disabled={isEditing && !canEdit} required/>
-                                <input name="paternalLastName" value={clientData.admin.paternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Paterno" className="p-2 border rounded" disabled={isEditing && !canEdit} required/>
-                                <input name="maternalLastName" value={clientData.admin.maternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Materno" className="p-2 border rounded" disabled={isEditing && !canEdit} required/>
-                                <input name="phone" type="tel" value={clientData.admin.phone} onChange={e => handleChange(e, 'admin')} placeholder="Número Telefónico" className="p-2 border rounded col-span-1 md:col-span-3" disabled={isEditing && !canEdit} required/>
+                                <input name="firstName" value={clientData.admin.firstName} onChange={e => handleChange(e, 'admin')} placeholder="Nombre(s)" className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                <input name="paternalLastName" value={clientData.admin.paternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Paterno" className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                <input name="maternalLastName" value={clientData.admin.maternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Materno" className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                <input name="phone" type="tel" value={clientData.admin.phone} onChange={e => handleChange(e, 'admin')} placeholder="Número Telefónico" className="p-2 border rounded col-span-1 md:col-span-3" disabled={isEditing && !canEdit} />
                             </div>
                         </div>
                         
