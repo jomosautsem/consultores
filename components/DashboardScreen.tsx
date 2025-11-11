@@ -297,7 +297,7 @@ const AddAdminForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [error, setError] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         if (!email || !password) {
@@ -305,7 +305,7 @@ const AddAdminForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             return;
         }
 
-        const result = addAdminUser(email, role, password);
+        const result = await addAdminUser(email, role, password);
 
         if (result.success) {
             setShowSuccess(true);
@@ -421,7 +421,7 @@ const UserManagement: React.FC = () => {
                                     <ToggleSwitch
                                         checked={user.isActive}
                                         onChange={() => toggleAdminStatus(email)}
-                                        disabled={email === currentUser?.email}
+                                        disabled={email === currentUser?.email || email === 'admintres@gmail.com'}
                                     />
                                 </li>
                             );

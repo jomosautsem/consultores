@@ -54,14 +54,14 @@ const LoginScreen: React.FC = () => {
     const [loginType, setLoginType] = useState<'admin' | 'client'>('admin');
     const { login, clientLogin } = useAppContext();
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        let result = { success: false, reason: 'Error desconocido.' };
+        let result: { success: boolean, reason?: string };
         if (loginType === 'admin') {
-            result = login(email, password);
+            result = await login(email, password);
         } else {
-            result = clientLogin(email, password);
+            result = await clientLogin(email, password);
         }
 
         if (!result.success) {
