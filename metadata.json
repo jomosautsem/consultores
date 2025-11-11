@@ -1,0 +1,5 @@
+{
+  "name": "Grupo Kali Consultores",
+  "description": "A client management system for Grupo Kali Consultores, an accounting consulting firm. Allows different administrator levels to manage client information based on their permissions.",
+  "requestFramePermissions": []
+}
