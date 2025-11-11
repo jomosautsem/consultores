@@ -173,13 +173,27 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                                 
                                 <div className="space-y-1">
                                     <label htmlFor="eFirma" className="block text-sm font-medium text-slate-600">Firma Electrónica (.zip)</label>
-                                    <input id="eFirma" name="eFirma" type="file" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".zip" disabled={isEditing && !canEdit} />
-                                    {isEditing && clientData.eFirma && <p className="text-xs text-slate-500 mt-1">Archivo actual: {clientData.eFirma}</p>}
+                                    {(!isEditing || canEdit) && (
+                                        <input id="eFirma" name="eFirma" type="file" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".zip" />
+                                    )}
+                                    {isEditing && clientData.eFirma && (
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Archivo actual: {clientData.eFirma}
+                                            {!canEdit && <span className="text-slate-400"> (solo vista)</span>}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="space-y-1 col-span-1 md:col-span-2">
                                     <label htmlFor="csf" className="block text-sm font-medium text-slate-600">Constancia de Situación Fiscal (.pdf)</label>
-                                    <input id="csf" name="csf" type="file" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".pdf" disabled={isEditing && !canEdit} />
-                                    {isEditing && clientData.csf && <p className="text-xs text-slate-500 mt-1">Archivo actual: {clientData.csf}</p>}
+                                    {(!isEditing || canEdit) && (
+                                        <input id="csf" name="csf" type="file" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".pdf" />
+                                    )}
+                                    {isEditing && clientData.csf && (
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Archivo actual: {clientData.csf}
+                                            {!canEdit && <span className="text-slate-400"> (solo vista)</span>}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>
