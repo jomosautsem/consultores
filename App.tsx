@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useContext, createContext, useEffect } from 'react';
 import type { User, Client, Message, ClientAdmin } from './types';
 import { UserRole, SatStatus } from './types';
@@ -120,16 +121,16 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         if (adminsRes.error) throw adminsRes.error;
         if (messagesRes.error) throw messagesRes.error;
 
-        setClients(clientsRes.data.map(clientFromSupabase));
+        setClients((clientsRes.data || []).map(clientFromSupabase));
         
-        const adminsObject = adminsRes.data.reduce((acc, admin) => {
+        const adminsObject = (adminsRes.data || []).reduce((acc, admin) => {
             const { email, details } = adminUserFromSupabase(admin);
             acc[email] = details;
             return acc;
         }, {} as AdminUsersState);
         setAdminUsers(adminsObject);
 
-        setMessages(messagesRes.data.map(messageFromSupabase));
+        setMessages((messagesRes.data || []).map(messageFromSupabase));
 
       } catch (error) {
         console.error("Error fetching initial data:", error);
