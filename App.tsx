@@ -27,6 +27,8 @@ const clientFromSupabase = (dbClient: any): Client => ({
     paternalLastName: dbClient.contact_admin_paternal_last_name,
     maternalLastName: dbClient.contact_admin_maternal_last_name,
     phone: dbClient.contact_admin_phone,
+    eFirma: dbClient.contact_admin_e_firma_filename,
+    csf: dbClient.contact_admin_csf_filename,
   },
 });
 
@@ -45,6 +47,8 @@ const clientToSupabase = (client: Omit<Client, 'id' | 'satStatus' | 'isActive'> 
     contact_admin_paternal_last_name: client.admin.paternalLastName,
     contact_admin_maternal_last_name: client.admin.maternalLastName,
     contact_admin_phone: client.admin.phone,
+    contact_admin_e_firma_filename: client.admin.eFirma,
+    contact_admin_csf_filename: client.admin.csf,
     // Include status and active state if they exist on the object (for updates)
     ...('satStatus' in client && { sat_status: client.satStatus }),
     ...('isActive' in client && { is_active: client.isActive }),

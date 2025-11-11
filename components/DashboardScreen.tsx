@@ -43,7 +43,9 @@ const emptyClient: Omit<Client, 'id' | 'satStatus' | 'isActive'> = {
         firstName: '',
         paternalLastName: '',
         maternalLastName: '',
-        phone: ''
+        phone: '',
+        eFirma: '',
+        csf: '',
     }
 };
 
@@ -74,6 +76,16 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
             setClientData(prev => ({ ...prev, [name]: files[0].name }));
         }
     };
+
+    const handleAdminFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, files } = e.target;
+        if (files && files.length > 0) {
+            setClientData(prev => ({
+                ...prev,
+                admin: { ...prev.admin, [name]: files[0].name }
+            }));
+        }
+    };
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -83,8 +95,8 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
         const { companyName, legalName, location, email, phone, rfc, eFirma, csf, password, admin } = clientData;
         const requiredFields = { companyName, legalName, location, email, phone, rfc, adminFirstName: admin.firstName, adminPaternalLastName: admin.paternalLastName, adminMaternalLastName: admin.maternalLastName, adminPhone: admin.phone };
 
-        for (const value of Object.values(requiredFields)) {
-            if (!value || !value.trim()) {
+        for (const [key, value] of Object.entries(requiredFields)) {
+            if (!value || !String(value).trim()) {
                 setError('Por favor, complete todos los campos obligatorios.');
                 return;
             }
@@ -96,11 +108,19 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                 return;
             }
             if (!eFirma) {
-                setError('Por favor, adjunte la Firma Electrónica (.zip).');
+                setError('Por favor, adjunte la Firma Electrónica (.zip) de la empresa.');
                 return;
             }
             if (!csf) {
-                setError('Por favor, adjunte la Constancia de Situación Fiscal (.pdf).');
+                setError('Por favor, adjunte la Constancia de Situación Fiscal (.pdf) de la empresa.');
+                return;
+            }
+            if (!admin.eFirma) {
+                setError('Por favor, adjunte la Firma Electrónica (.zip) del administrador.');
+                return;
+            }
+            if (!admin.csf) {
+                setError('Por favor, adjunte la Constancia de Situación Fiscal (.pdf) del administrador.');
                 return;
             }
         }
@@ -167,7 +187,7 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                         </div>
 
                         <div className="mb-6 p-4 border border-slate-200 rounded-md">
-                            <h3 className="text-lg font-semibold text-emerald-700 mb-4">Documentos Fiscales</h3>
+                            <h3 className="text-lg font-semibold text-emerald-700 mb-4">Documentos Fiscales de la Empresa</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <input name="rfc" value={clientData.rfc} onChange={handleChange} placeholder="RFC Razón Social" className="p-2 border rounded" disabled={isEditing && !canEdit} />
                                 
@@ -200,11 +220,36 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                         
                         <div className="mb-6 p-4 border border-slate-200 rounded-md">
                              <h3 className="text-lg font-semibold text-emerald-700 mb-4">Datos del Administrador</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-y-4 gap-x-4">
                                 <input name="firstName" value={clientData.admin.firstName} onChange={e => handleChange(e, 'admin')} placeholder="Nombre(s)" className="p-2 border rounded" disabled={isEditing && !canEdit} />
                                 <input name="paternalLastName" value={clientData.admin.paternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Paterno" className="p-2 border rounded" disabled={isEditing && !canEdit} />
                                 <input name="maternalLastName" value={clientData.admin.maternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Materno" className="p-2 border rounded" disabled={isEditing && !canEdit} />
                                 <input name="phone" type="tel" value={clientData.admin.phone} onChange={e => handleChange(e, 'admin')} placeholder="Número Telefónico" className="p-2 border rounded col-span-1 md:col-span-3" disabled={isEditing && !canEdit} />
+
+                                <div className="space-y-1 col-span-1 md:col-span-3">
+                                    <label htmlFor="adminEFirma" className="block text-sm font-medium text-slate-600">Firma Electrónica del Administrador (.zip)</label>
+                                    {(!isEditing || canEdit) && (
+                                        <input id="adminEFirma" name="eFirma" type="file" onChange={handleAdminFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".zip" />
+                                    )}
+                                    {isEditing && clientData.admin.eFirma && (
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Archivo actual: {clientData.admin.eFirma}
+                                            {!canEdit && <span className="text-slate-400"> (solo vista)</span>}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="space-y-1 col-span-1 md:col-span-3">
+                                    <label htmlFor="adminCsf" className="block text-sm font-medium text-slate-600">Constancia de Situación Fiscal del Administrador (.pdf)</label>
+                                    {(!isEditing || canEdit) && (
+                                        <input id="adminCsf" name="csf" type="file" onChange={handleAdminFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" accept=".pdf" />
+                                    )}
+                                    {isEditing && clientData.admin.csf && (
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Archivo actual: {clientData.admin.csf}
+                                            {!canEdit && <span className="text-slate-400"> (solo vista)</span>}
+                                        </p>
+                                    )}
+                                </div>
                             </div>
                         </div>
                         

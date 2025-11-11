@@ -22,6 +22,8 @@ export interface ClientAdmin {
   paternalLastName: string;
   maternalLastName: string;
   phone: string;
+  eFirma?: string;
+  csf?: string;
 }
 
 export interface Client {
