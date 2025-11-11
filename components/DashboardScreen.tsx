@@ -56,6 +56,9 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
     const [clientData, setClientData] = useState(isEditing ? clientToEdit : { ...emptyClient, satStatus: SatStatus.PENDIENTE, isActive: true });
     const [showSuccess, setShowSuccess] = useState(false);
     const [error, setError] = useState('');
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [statusUpdateMsg, setStatusUpdateMsg] = useState('');
+
 
     const canEdit = currentUser?.role === UserRole.LEVEL_3;
 
@@ -86,6 +89,26 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                 admin: { ...prev.admin, [name]: files[0].name }
             }));
         }
+    };
+
+    const handleSatStatusChange = async (newStatus: SatStatus) => {
+        if (!clientToEdit || isUpdatingStatus || !canEdit) return;
+
+        setIsUpdatingStatus(true);
+        setStatusUpdateMsg('');
+
+        const updatedClient: Client = { ...clientToEdit, satStatus: newStatus };
+        const result = await updateClient(updatedClient);
+
+        if (result.success) {
+            setClientData(prevData => ({ ...prevData, satStatus: newStatus }));
+            setStatusUpdateMsg('¡Estado actualizado!');
+            setTimeout(() => setStatusUpdateMsg(''), 2000);
+        } else {
+            setStatusUpdateMsg(result.reason || 'Error al actualizar.');
+        }
+
+        setIsUpdatingStatus(false);
     };
 
     // Placeholder functions for file actions
@@ -164,6 +187,31 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
         }
     };
 
+    const StatusPill: React.FC<{ status: SatStatus, interactive?: boolean, onClick?: (status: SatStatus) => void, current?: SatStatus, disabled?: boolean }> = ({ status, interactive, onClick, current, disabled }) => {
+        const statusStyles: Record<SatStatus, string> = {
+            [SatStatus.AL_CORRIENTE]: 'bg-green-100 text-green-800',
+            [SatStatus.CON_ADEUDOS]: 'bg-red-100 text-red-800',
+            [SatStatus.EN_REVISION]: 'bg-yellow-100 text-yellow-800',
+            [SatStatus.PENDIENTE]: 'bg-slate-100 text-slate-800',
+        };
+
+        const activeStyles = 'ring-2 ring-offset-1 ring-emerald-500';
+        const interactiveStyles = 'transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-wait';
+        
+        const isCurrent = status === current;
+
+        return (
+            <button
+                type="button"
+                onClick={() => onClick && onClick(status)}
+                disabled={!interactive || disabled}
+                className={`w-full text-left p-3 rounded-lg font-semibold ${statusStyles[status]} ${interactive && interactiveStyles} ${isCurrent && activeStyles}`}
+            >
+                {status}
+            </button>
+        );
+    };
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-20">
             <div className="bg-white rounded-lg shadow-xl p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -194,18 +242,20 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                                 {!isEditing && (
                                      <input name="password" type="password" value={clientData.password || ''} onChange={handleChange} placeholder="Crear Contraseña para Cliente" className="p-2 border rounded" />
                                 )}
-                                {isEditing && canEdit && (
-                                     <div className="col-span-1 md:col-span-2">
-                                        <label htmlFor="satStatus" className="block text-sm font-medium text-slate-600 mb-1">Estado con el SAT</label>
-                                        <select id="satStatus" name="satStatus" value={clientData.satStatus} onChange={handleChange} className="p-2 border rounded w-full" disabled={!canEdit}>
-                                            {Object.values(SatStatus).map(status => (
-                                                <option key={status} value={status}>{status}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
                             </div>
                         </div>
+
+                         {isEditing && (
+                            <div className="mb-6 p-4 border border-slate-200 rounded-md">
+                                <h3 className="text-lg font-semibold text-emerald-700 mb-4">Estado con el SAT</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    <StatusPill status={SatStatus.AL_CORRIENTE} interactive={canEdit} onClick={handleSatStatusChange} current={clientData.satStatus} disabled={isUpdatingStatus} />
+                                    <StatusPill status={SatStatus.CON_ADEUDOS} interactive={canEdit} onClick={handleSatStatusChange} current={clientData.satStatus} disabled={isUpdatingStatus} />
+                                    <StatusPill status={SatStatus.PENDIENTE} interactive={canEdit} onClick={handleSatStatusChange} current={clientData.satStatus} disabled={isUpdatingStatus} />
+                                </div>
+                                {statusUpdateMsg && <p className={`text-sm mt-2 text-center ${statusUpdateMsg.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>{statusUpdateMsg}</p>}
+                            </div>
+                        )}
 
                         <div className="mb-6 p-4 border border-slate-200 rounded-md">
                             <h3 className="text-lg font-semibold text-emerald-700 mb-4">Documentos Fiscales de la Empresa</h3>
