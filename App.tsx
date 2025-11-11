@@ -179,6 +179,16 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }, []);
 
   const addClient = useCallback(async (clientData: Omit<Client, 'id' | 'satStatus' | 'isActive'>): Promise<{ success: boolean; reason?: string }> => {
+    const trimmedEmail = clientData.email.trim().toLowerCase();
+    if (clients.some(c => c.email.toLowerCase() === trimmedEmail)) {
+        return { success: false, reason: 'Este correo electrónico ya está en uso.' };
+    }
+
+    const trimmedRfc = clientData.rfc.trim().toUpperCase();
+    if (clients.some(c => c.rfc.toUpperCase() === trimmedRfc)) {
+        return { success: false, reason: 'Este RFC ya está registrado.' };
+    }
+
     const supabaseClient = clientToSupabase(clientData);
     
     const { data, error } = await supabase
@@ -209,7 +219,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       -----------------------
     `);
     return { success: true };
-  }, []);
+  }, [clients]);
 
   const updateClient = useCallback(async (updatedClient: Client): Promise<{ success: boolean; reason?: string }> => {
     const supabaseClient = clientToSupabase(updatedClient);
