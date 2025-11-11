@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useContext, createContext, useEffect } from 'react';
 import type { User, Client, Message, ClientAdmin } from './types';
 import { UserRole, SatStatus } from './types';
@@ -182,7 +183,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     
     const { data, error } = await supabase
       .from('clients')
-      .insert({ ...supabaseClient, sat_status: SatStatus.PENDIENTE, is_active: true })
+      .insert({ id: crypto.randomUUID(), ...supabaseClient, sat_status: SatStatus.PENDIENTE, is_active: true })
       .select()
       .single();
 
