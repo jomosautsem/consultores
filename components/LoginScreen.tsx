@@ -76,11 +76,20 @@ const LoginScreen: React.FC = () => {
         setPassword('');
     }
 
+    const backgroundStyle = {
+        backgroundImage: `linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(16, 185, 129, 0.8)), url('https://images.unsplash.com/photo-1554224155-1696413565d3?auto=format&fit=crop&q=80&w=2070')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+    };
+
     return (
         <>
-            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4">
+            <div 
+                className="min-h-screen flex flex-col items-center justify-center p-4"
+                style={backgroundStyle}
+            >
                 <div className="w-full max-w-md">
-                    <div className="bg-white shadow-2xl rounded-2xl p-8 md:p-12">
+                    <div className="bg-white/95 backdrop-blur-sm shadow-2xl rounded-2xl p-8 md:p-12">
                         <div className="flex flex-col items-center mb-6">
                             <div className="bg-emerald-600 p-4 rounded-full mb-4 text-white">
                                 <BuildingOfficeIcon className="w-10 h-10" />
