@@ -51,6 +51,7 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
     const isEditing = clientToEdit !== null;
     const [clientData, setClientData] = useState(isEditing ? clientToEdit : { ...emptyClient, satStatus: SatStatus.PENDIENTE, isActive: true });
     const [showSuccess, setShowSuccess] = useState(false);
+    const [error, setError] = useState('');
 
     const canEdit = currentUser?.role === UserRole.LEVEL_3;
 
@@ -73,17 +74,26 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
         }
     };
     
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError('');
+        
+        let result: { success: boolean; reason?: string };
+
         if (isEditing && clientToEdit) {
-            updateClient(clientData as Client);
+            result = await updateClient(clientData as Client);
         } else {
-            addClient(clientData);
+            result = await addClient(clientData);
         }
-        setShowSuccess(true);
-        setTimeout(() => {
-          onFinish();
-        }, 2000);
+        
+        if (result.success) {
+            setShowSuccess(true);
+            setTimeout(() => {
+              onFinish();
+            }, 2000);
+        } else {
+            setError(result.reason || 'Ocurrió un error inesperado.');
+        }
     };
 
     return (
@@ -156,6 +166,8 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                                 <input name="phone" type="tel" value={clientData.admin.phone} onChange={e => handleChange(e, 'admin')} placeholder="Número Telefónico" className="p-2 border rounded col-span-1 md:col-span-3" disabled={isEditing && !canEdit} required/>
                             </div>
                         </div>
+                        
+                        {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
 
                         {(currentUser?.role === UserRole.LEVEL_3 || !isEditing) && (
                           <div className="flex justify-end">

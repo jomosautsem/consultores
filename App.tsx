@@ -79,8 +79,8 @@ interface AppContextType {
   login: (email: string, pass: string) => Promise<{ success: boolean, reason?: string }>;
   clientLogin: (email: string, pass: string) => Promise<{ success: boolean, reason?: string }>;
   logout: () => void;
-  addClient: (client: Omit<Client, 'id' | 'satStatus' | 'isActive'>) => Promise<void>;
-  updateClient: (client: Client) => Promise<void>;
+  addClient: (client: Omit<Client, 'id' | 'satStatus' | 'isActive'>) => Promise<{ success: boolean; reason?: string }>;
+  updateClient: (client: Client) => Promise<{ success: boolean; reason?: string }>;
   sendMessage: (clientId: string, content: string) => Promise<void>;
   toggleAdminStatus: (email: string) => Promise<void>;
   toggleClientStatus: (clientId: string) => Promise<void>;
@@ -177,7 +177,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setCurrentClient(null);
   }, []);
 
-  const addClient = useCallback(async (clientData: Omit<Client, 'id' | 'satStatus' | 'isActive'>) => {
+  const addClient = useCallback(async (clientData: Omit<Client, 'id' | 'satStatus' | 'isActive'>): Promise<{ success: boolean; reason?: string }> => {
     const supabaseClient = clientToSupabase(clientData);
     
     const { data, error } = await supabase
@@ -188,7 +188,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
     if (error) {
         console.error("Error adding client:", error);
-        return;
+        return { success: false, reason: 'Error en la base de datos.' };
     }
     
     setClients(prevClients => [clientFromSupabase(data), ...prevClients]);
@@ -207,9 +207,10 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       Grupo Kali Consultores
       -----------------------
     `);
+    return { success: true };
   }, []);
 
-  const updateClient = useCallback(async (updatedClient: Client) => {
+  const updateClient = useCallback(async (updatedClient: Client): Promise<{ success: boolean; reason?: string }> => {
     const supabaseClient = clientToSupabase(updatedClient);
     
     const { data, error } = await supabase
@@ -221,9 +222,10 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     
     if (error) {
         console.error("Error updating client:", error);
-        return;
+        return { success: false, reason: 'Error en la base de datos.' };
     }
     setClients(prevClients => prevClients.map(c => c.id === updatedClient.id ? clientFromSupabase(data) : c));
+    return { success: true };
   }, []);
 
   const sendMessage = useCallback(async (clientId: string, content: string) => {
