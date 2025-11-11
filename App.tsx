@@ -194,7 +194,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     
     const { data, error } = await supabase
       .from('clients')
-      .insert({ id: crypto.randomUUID(), ...supabaseClient, sat_status: SatStatus.PENDIENTE, is_active: true })
+      .insert({ ...supabaseClient, sat_status: SatStatus.PENDIENTE, is_active: true })
       .select()
       .single();
 
