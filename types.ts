@@ -49,3 +49,39 @@ export interface Message {
   content: string;
   timestamp: string;
 }
+
+// --- New types for Tasks and Documents ---
+
+export enum TaskStatus {
+  PENDIENTE = 'Pendiente',
+  EN_PROCESO = 'En Proceso',
+  COMPLETADA = 'Completada',
+}
+
+export enum DocumentFolder {
+    GENERAL = 'General',
+    DECLARACIONES = 'Declaraciones Mensuales',
+    FACTURAS = 'Facturas',
+    LEGAL = 'Documentos Legales',
+}
+
+export interface Task {
+    id: string;
+    clientId: string;
+    title: string;
+    description?: string;
+    dueDate?: string;
+    status: TaskStatus;
+    createdAt: string;
+    completedAt?: string;
+}
+
+export interface Document {
+    id: string;
+    clientId: string;
+    fileName: string;
+    filePath: string;
+    folder: DocumentFolder;
+    uploadedBy: 'client' | 'admin';
+    uploadedAt: string;
+}
