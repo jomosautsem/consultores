@@ -107,6 +107,9 @@ interface AppContextType {
   deleteTask: (taskId: string) => Promise<{ success: boolean }>;
   uploadDocument: (clientId: string, file: File, folder: string, uploadedBy: 'client' | 'admin') => Promise<{ success: boolean; reason?: string }>;
   deleteDocument: (doc: Document) => Promise<{ success: boolean; reason?: string }>;
+  deleteClient: (clientId: string) => Promise<{ success: boolean; reason?: string }>;
+  updateAdminUser: (email: string, role: UserRole) => Promise<{ success: boolean; reason?: string }>;
+  deleteAdminUser: (email: string) => Promise<{ success: boolean; reason?: string }>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -229,10 +232,22 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             }
             if (payload.eventType === 'UPDATE') {
                 if (payload.table === 'tasks') setTasks(prev => prev.map(t => t.id === payload.new.id ? taskFromSupabase(payload.new) : t));
+                 if (payload.table === 'clients') setClients(prev => prev.map(c => c.id === payload.new.id ? clientFromSupabase(payload.new) : c));
+                 if (payload.table === 'administrators') {
+                    setAdminUsers(prev => ({...prev, [payload.new.email]: { role: payload.new.role, isActive: payload.new.is_active }}));
+                 }
             }
             if (payload.eventType === 'DELETE') {
                  if (payload.table === 'tasks') setTasks(prev => prev.filter(t => t.id !== payload.old.id));
                  if (payload.table === 'documents') setDocuments(prev => prev.filter(d => d.id !== payload.old.id));
+                 if (payload.table === 'clients') setClients(prev => prev.filter(c => c.id !== payload.old.id));
+                 if (payload.table === 'administrators') {
+                    setAdminUsers(prev => {
+                        const newAdmins = {...prev};
+                        delete newAdmins[payload.old.email];
+                        return newAdmins;
+                    });
+                 }
             }
         };
 
@@ -472,6 +487,83 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       return { success: true };
   }, []);
 
+  // --- New Admin Management Functions ---
+  const deleteClient = useCallback(async (clientId: string): Promise<{ success: boolean; reason?: string }> => {
+      const { data: clientDocs, error: docsError } = await supabase
+          .from('documents')
+          .select('file_path')
+          .eq('client_id', clientId);
+      
+      if (docsError) {
+          console.error("Error fetching client documents for deletion:", docsError);
+          return { success: false, reason: 'No se pudieron obtener los documentos del cliente para eliminar.' };
+      }
+
+      if (clientDocs && clientDocs.length > 0) {
+          const filePaths = clientDocs.map(doc => doc.file_path);
+          const { error: removeError } = await supabase.storage.from('client-files').remove(filePaths);
+          if (removeError) {
+              console.error("Error deleting client files from storage:", removeError);
+              return { success: false, reason: 'No se pudieron eliminar los archivos del cliente del almacenamiento.' };
+          }
+      }
+
+      await supabase.from('messages').delete().eq('client_id', clientId);
+      await supabase.from('tasks').delete().eq('client_id', clientId);
+      await supabase.from('documents').delete().eq('client_id', clientId);
+
+      const { error: deleteError } = await supabase.from('clients').delete().eq('id', clientId);
+      if (deleteError) {
+          console.error("Error deleting client:", deleteError);
+          return { success: false, reason: 'Error al eliminar el cliente de la base de datos.' };
+      }
+
+      setClients(prev => prev.filter(c => c.id !== clientId));
+      return { success: true };
+  }, []);
+
+  const updateAdminUser = useCallback(async (email: string, role: UserRole): Promise<{ success: boolean; reason?: string }> => {
+      const { error } = await supabase
+          .from('administrators')
+          .update({ role: role })
+          .eq('email', email);
+
+      if (error) {
+          console.error("Error updating admin user:", error);
+          return { success: false, reason: "No se pudo actualizar el rol del administrador." };
+      }
+
+      setAdminUsers(prev => ({
+          ...prev,
+          [email]: { ...prev[email], role: role }
+      }));
+      return { success: true };
+  }, []);
+
+  const deleteAdminUser = useCallback(async (email: string): Promise<{ success: boolean; reason?: string }> => {
+      if (currentUser && currentUser.email === email) {
+          return { success: false, reason: "No puede eliminar su propia cuenta." };
+      }
+      
+      const { error } = await supabase
+          .from('administrators')
+          .delete()
+          .eq('email', email);
+      
+      if (error) {
+          console.error("Error deleting admin user:", error);
+          return { success: false, reason: "No se pudo eliminar al administrador." };
+      }
+
+      setAdminUsers(prev => {
+          const newAdmins = { ...prev };
+          delete newAdmins[email];
+          return newAdmins;
+      });
+
+      return { success: true };
+  }, [currentUser]);
+
   const contextValue = {
     currentUser,
     currentClient,
@@ -496,6 +588,9 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     deleteTask,
     uploadDocument,
     deleteDocument,
+    deleteClient,
+    updateAdminUser,
+    deleteAdminUser,
   };
 
   return (

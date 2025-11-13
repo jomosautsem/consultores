@@ -1,11 +1,12 @@
 
 
 
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../App';
 import { UserRole, Client, SatStatus, Message, Task, Document, TaskStatus, DocumentFolder } from '../types';
 // Fix: Imported PaperAirplaneIcon.
-import { LogoutIcon, UserCircleIcon, BuildingOfficeIcon, PlusIcon, XMarkIcon, InboxIcon, UsersIcon, ClipboardDocumentListIcon, DocumentDuplicateIcon, PaperAirplaneIcon } from './ui/Icons';
+import { LogoutIcon, UserCircleIcon, BuildingOfficeIcon, PlusIcon, XMarkIcon, InboxIcon, UsersIcon, ClipboardDocumentListIcon, DocumentDuplicateIcon, PaperAirplaneIcon, TrashIcon } from './ui/Icons';
 import { supabase } from '../supabaseClient';
 
 
@@ -381,7 +382,7 @@ const TaskManager: React.FC<{ client: Client }> = ({ client }) => {
 
 
 const ClientList: React.FC<{ onSelectClient: (client: Client) => void }> = ({ onSelectClient }) => {
-    const { clients, loading } = useAppContext();
+    const { clients, loading, currentUser, deleteClient } = useAppContext();
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredClients = useMemo(() => {
@@ -391,6 +392,15 @@ const ClientList: React.FC<{ onSelectClient: (client: Client) => void }> = ({ on
             client.rfc.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [clients, searchTerm]);
+
+    const handleDelete = async (clientId: string, companyName: string) => {
+        if (window.confirm(`¿Está seguro que desea eliminar al cliente "${companyName}"? Esta acción no se puede deshacer y eliminará todos sus datos.`)) {
+            const result = await deleteClient(clientId);
+            if (!result.success) {
+                alert(result.reason || "Ocurrió un error al eliminar el cliente.");
+            }
+        }
+    };
 
     if (loading) return <div className="text-center p-8">Cargando clientes...</div>;
 
@@ -424,7 +434,12 @@ const ClientList: React.FC<{ onSelectClient: (client: Client) => void }> = ({ on
                                 <td className="p-3 text-slate-600">{client.satStatus}</td>
                                 <td className="p-3"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${client.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{client.isActive ? 'Activo' : 'Inactivo'}</span></td>
                                 <td className="p-3">
-                                    <button onClick={() => onSelectClient(client)} className="text-emerald-600 hover:underline font-semibold">Ver Detalles</button>
+                                    <div className="flex items-center space-x-4">
+                                        <button onClick={() => onSelectClient(client)} className="text-emerald-600 hover:underline font-semibold">Ver Detalles</button>
+                                        {currentUser?.role === UserRole.LEVEL_3 && (
+                                            <button onClick={() => handleDelete(client.id, client.companyName)} className="text-red-600 hover:underline font-semibold">Eliminar</button>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -508,7 +523,7 @@ const MessagesInbox: React.FC = () => {
 };
 
 const UserManagement: React.FC = () => {
-    const { adminUsers, addAdminUser, toggleAdminStatus } = useAppContext();
+    const { adminUsers, addAdminUser, toggleAdminStatus, currentUser, updateAdminUser, deleteAdminUser } = useAppContext();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<UserRole>(UserRole.LEVEL_1);
@@ -531,6 +546,19 @@ const UserManagement: React.FC = () => {
             setRole(UserRole.LEVEL_1);
         } else {
             setError(result.reason || 'No se pudo añadir el usuario.');
+        }
+    };
+
+    const handleRoleChange = async (email: string, newRole: UserRole) => {
+        await updateAdminUser(email, newRole);
+    };
+
+    const handleDelete = async (email: string) => {
+        if (window.confirm(`¿Está seguro que desea eliminar al administrador "${email}"? Perderá acceso al sistema.`)) {
+            const result = await deleteAdminUser(email);
+            if (!result.success) {
+                alert(result.reason || "Ocurrió un error al eliminar al administrador.");
+            }
         }
     };
     
@@ -556,19 +584,39 @@ const UserManagement: React.FC = () => {
                 <div>
                     <h4 className="font-semibold mb-4 text-slate-700">Administradores Actuales</h4>
                     <ul className="space-y-2 max-h-96 overflow-y-auto">
-                        {/* Fix: Changed from Object.entries to Object.keys to avoid type inference issues. */}
                         {Object.keys(adminUsers).map((email) => {
                             const user = adminUsers[email];
+                            const canEdit = currentUser?.role === UserRole.LEVEL_3 && currentUser.email !== email;
                             return (
                                 <li key={email} className="p-3 bg-white border rounded-lg flex justify-between items-center">
                                     <div>
                                         <p className="font-medium text-slate-800">{email}</p>
-                                        <p className="text-sm text-slate-500">Rol: {user.role.replace('_', ' ')}</p>
+                                        {canEdit ? (
+                                            <select
+                                                value={user.role}
+                                                onChange={(e) => handleRoleChange(email, e.target.value as UserRole)}
+                                                className="text-sm text-slate-500 mt-1 p-1 border rounded bg-slate-50"
+                                            >
+                                                <option value={UserRole.LEVEL_1}>Nivel 1 (Ver)</option>
+                                                <option value={UserRole.LEVEL_2}>Nivel 2 (Ver/Editar)</option>
+                                                <option value={UserRole.LEVEL_3}>Nivel 3 (Total)</option>
+                                            </select>
+                                        ) : (
+                                            <p className="text-sm text-slate-500">Rol: {user.role.replace('_', ' ')}</p>
+                                        )}
                                     </div>
-                                    <button onClick={() => toggleAdminStatus(email)}
-                                        className={`px-3 py-1 text-xs font-semibold rounded-full ${user.isActive ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
-                                        {user.isActive ? 'Activo' : 'Inactivo'}
-                                    </button>
+                                    <div className="flex items-center space-x-2">
+                                        <button onClick={() => toggleAdminStatus(email)}
+                                            disabled={!canEdit}
+                                            className={`px-3 py-1 text-xs font-semibold rounded-full disabled:opacity-50 disabled:cursor-not-allowed ${user.isActive ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
+                                            {user.isActive ? 'Activo' : 'Inactivo'}
+                                        </button>
+                                        {canEdit && (
+                                            <button onClick={() => handleDelete(email)} className="p-1 text-red-500 hover:text-red-700" title="Eliminar administrador">
+                                                <TrashIcon className="w-5 h-5" />
+                                            </button>
+                                        )}
+                                    </div>
                                 </li>
                             );
                         })}
