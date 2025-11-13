@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../App';
 import { UserRole, Client, SatStatus, Message, Task, Document, TaskStatus, DocumentFolder } from '../types';
@@ -180,22 +176,22 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                                     <div className="p-4 border rounded-lg">
                                         <h4 className="font-semibold text-slate-700 mb-3">Datos de la Empresa</h4>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input name="companyName" value={clientData.companyName} onChange={handleChange} placeholder="Nombre Comercial" required className="p-2 border rounded" />
-                                            <input name="legalName" value={clientData.legalName} onChange={handleChange} placeholder="Razón Social" required className="p-2 border rounded" />
-                                            <input name="rfc" value={clientData.rfc} onChange={handleChange} placeholder="RFC" required className="p-2 border rounded" />
-                                            <input name="location" value={clientData.location} onChange={handleChange} placeholder="Ubicación (Ciudad, Estado)" required className="p-2 border rounded" />
-                                            <input name="email" type="email" value={clientData.email} onChange={handleChange} placeholder="Correo Electrónico" required className="p-2 border rounded" />
-                                            <input name="phone" value={clientData.phone} onChange={handleChange} placeholder="Teléfono" required className="p-2 border rounded" />
+                                            <input name="companyName" value={clientData.companyName} onChange={handleChange} placeholder="Nombre Comercial" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                            <input name="legalName" value={clientData.legalName} onChange={handleChange} placeholder="Razón Social" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                            <input name="rfc" value={clientData.rfc} onChange={handleChange} placeholder="RFC" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                            <input name="location" value={clientData.location} onChange={handleChange} placeholder="Ubicación (Ciudad, Estado)" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                            <input name="email" type="email" value={clientData.email} onChange={handleChange} placeholder="Correo Electrónico" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                            <input name="phone" value={clientData.phone} onChange={handleChange} placeholder="Teléfono" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
                                             {!isEditing && <input name="password" type="password" value={clientData.password || ''} onChange={handleChange} placeholder="Contraseña para portal" required className="p-2 border rounded" />}
                                         </div>
                                     </div>
                                     <div className="p-4 border rounded-lg">
                                         <h4 className="font-semibold text-slate-700 mb-3">Datos del Administrador/Contacto</h4>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input name="firstName" value={clientData.admin.firstName} onChange={e => handleChange(e, 'admin')} placeholder="Nombres" required className="p-2 border rounded" />
-                                            <input name="paternalLastName" value={clientData.admin.paternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Paterno" required className="p-2 border rounded" />
-                                            <input name="maternalLastName" value={clientData.admin.maternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Materno" required className="p-2 border rounded" />
-                                            <input name="phone" value={clientData.admin.phone} onChange={e => handleChange(e, 'admin')} placeholder="Teléfono del contacto" required className="p-2 border rounded" />
+                                            <input name="firstName" value={clientData.admin.firstName} onChange={e => handleChange(e, 'admin')} placeholder="Nombres" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                            <input name="paternalLastName" value={clientData.admin.paternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Paterno" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                            <input name="maternalLastName" value={clientData.admin.maternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Materno" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                            <input name="phone" value={clientData.admin.phone} onChange={e => handleChange(e, 'admin')} placeholder="Teléfono del contacto" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
                                         </div>
                                     </div>
                                     {isEditing && (
@@ -280,19 +276,21 @@ const DocumentManager: React.FC<{ client: Client }> = ({ client }) => {
     return (
         <div>
             <h3 className="text-xl font-bold text-slate-800 mb-4">Expediente Digital</h3>
-            <div className="bg-slate-50 p-4 rounded-lg border">
-                <h4 className="font-semibold mb-2 text-slate-700">Subir Nuevo Documento</h4>
-                <div className="flex items-center space-x-4">
-                    <input type="file" onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} className="flex-grow block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"/>
-                    <select value={folder} onChange={(e) => setFolder(e.target.value as DocumentFolder)} className="p-2 border rounded-md">
-                        {Object.values(DocumentFolder).map(f => <option key={f} value={f}>{f}</option>)}
-                    </select>
-                    <button onClick={handleUpload} disabled={!file || isUploading} className="bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 disabled:bg-slate-400">
-                        {isUploading ? 'Subiendo...' : 'Subir'}
-                    </button>
+            {currentUser?.role === UserRole.LEVEL_3 && (
+                <div className="bg-slate-50 p-4 rounded-lg border">
+                    <h4 className="font-semibold mb-2 text-slate-700">Subir Nuevo Documento</h4>
+                    <div className="flex items-center space-x-4">
+                        <input type="file" onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} className="flex-grow block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"/>
+                        <select value={folder} onChange={(e) => setFolder(e.target.value as DocumentFolder)} className="p-2 border rounded-md">
+                            {Object.values(DocumentFolder).map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                        <button onClick={handleUpload} disabled={!file || isUploading} className="bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 disabled:bg-slate-400">
+                            {isUploading ? 'Subiendo...' : 'Subir'}
+                        </button>
+                    </div>
+                    {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                 </div>
-                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-            </div>
+            )}
 
             <div className="mt-6">
                 <h4 className="font-semibold mb-2 text-slate-700">Documentos Existentes</h4>
@@ -311,6 +309,7 @@ const DocumentManager: React.FC<{ client: Client }> = ({ client }) => {
                             </div>
                         </li>
                     ))}
+                     {clientDocuments.length === 0 && <p className="text-slate-500 text-sm p-4 text-center">No hay documentos.</p>}
                 </ul>
             </div>
         </div>
@@ -345,14 +344,16 @@ const TaskManager: React.FC<{ client: Client }> = ({ client }) => {
     return (
         <div>
             <h3 className="text-xl font-bold text-slate-800 mb-4">Gestión de Tareas</h3>
-             <form onSubmit={handleAddTask} className="bg-slate-50 p-4 rounded-lg border mb-6 space-y-3">
-                <h4 className="font-semibold text-slate-700">Crear Nueva Tarea</h4>
-                <div className="flex items-center space-x-4">
-                   <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título de la tarea" className="flex-grow p-2 border rounded" required />
-                   <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="p-2 border rounded" />
-                   <button type="submit" className="bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700">Crear</button>
-                </div>
-            </form>
+            {currentUser?.role === UserRole.LEVEL_3 && (
+                <form onSubmit={handleAddTask} className="bg-slate-50 p-4 rounded-lg border mb-6 space-y-3">
+                    <h4 className="font-semibold text-slate-700">Crear Nueva Tarea</h4>
+                    <div className="flex items-center space-x-4">
+                        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título de la tarea" className="flex-grow p-2 border rounded" required />
+                        <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="p-2 border rounded" />
+                        <button type="submit" className="bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700">Crear</button>
+                    </div>
+                </form>
+            )}
              <div className="mt-6">
                 <h4 className="font-semibold mb-2 text-slate-700">Tareas Activas</h4>
                 <ul className="space-y-2">
@@ -363,7 +364,7 @@ const TaskManager: React.FC<{ client: Client }> = ({ client }) => {
                                 <p className="text-xs text-slate-500">Vence: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}</p>
                             </div>
                              <div className="flex items-center space-x-3">
-                               <select value={task.status} onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)} className="text-sm p-1 border rounded-md bg-slate-100">
+                               <select value={task.status} onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)} className="text-sm p-1 border rounded-md bg-slate-100" disabled={currentUser?.role !== UserRole.LEVEL_3}>
                                    {Object.values(TaskStatus).map(s => <option key={s} value={s}>{s}</option>)}
                                </select>
                                {currentUser?.role === UserRole.LEVEL_3 && (
@@ -374,6 +375,7 @@ const TaskManager: React.FC<{ client: Client }> = ({ client }) => {
                             </div>
                         </li>
                     ))}
+                     {clientTasks.length === 0 && <p className="text-slate-500 text-sm p-4 text-center">No hay tareas asignadas.</p>}
                 </ul>
             </div>
         </div>
@@ -420,27 +422,29 @@ const ClientList: React.FC<{ onSelectClient: (client: Client) => void }> = ({ on
                     <thead>
                         <tr className="bg-slate-50 border-b">
                             <th className="p-3 font-semibold text-slate-600">Empresa</th>
-                            <th className="p-3 font-semibold text-slate-600">RFC</th>
+                            {currentUser?.role !== UserRole.LEVEL_1 && <th className="p-3 font-semibold text-slate-600">RFC</th>}
                             <th className="p-3 font-semibold text-slate-600">Estado SAT</th>
-                            <th className="p-3 font-semibold text-slate-600">Estado</th>
-                            <th className="p-3 font-semibold text-slate-600">Acciones</th>
+                            {currentUser?.role !== UserRole.LEVEL_1 && <th className="p-3 font-semibold text-slate-600">Estado</th>}
+                            {currentUser?.role !== UserRole.LEVEL_1 && <th className="p-3 font-semibold text-slate-600">Acciones</th>}
                         </tr>
                     </thead>
                     <tbody>
                         {filteredClients.map(client => (
                             <tr key={client.id} className="border-b hover:bg-slate-50">
                                 <td className="p-3 font-medium text-slate-800">{client.companyName}</td>
-                                <td className="p-3 text-slate-600">{client.rfc}</td>
+                                {currentUser?.role !== UserRole.LEVEL_1 && <td className="p-3 text-slate-600">{client.rfc}</td>}
                                 <td className="p-3 text-slate-600">{client.satStatus}</td>
-                                <td className="p-3"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${client.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{client.isActive ? 'Activo' : 'Inactivo'}</span></td>
-                                <td className="p-3">
-                                    <div className="flex items-center space-x-4">
-                                        <button onClick={() => onSelectClient(client)} className="text-emerald-600 hover:underline font-semibold">Ver Detalles</button>
-                                        {currentUser?.role === UserRole.LEVEL_3 && (
-                                            <button onClick={() => handleDelete(client.id, client.companyName)} className="text-red-600 hover:underline font-semibold">Eliminar</button>
-                                        )}
-                                    </div>
-                                </td>
+                                {currentUser?.role !== UserRole.LEVEL_1 && <td className="p-3"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${client.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{client.isActive ? 'Activo' : 'Inactivo'}</span></td>}
+                                {currentUser?.role !== UserRole.LEVEL_1 && (
+                                    <td className="p-3">
+                                        <div className="flex items-center space-x-4">
+                                            <button onClick={() => onSelectClient(client)} className="text-emerald-600 hover:underline font-semibold">Ver Detalles</button>
+                                            {currentUser?.role === UserRole.LEVEL_3 && (
+                                                <button onClick={() => handleDelete(client.id, client.companyName)} className="text-red-600 hover:underline font-semibold">Eliminar</button>
+                                            )}
+                                        </div>
+                                    </td>
+                                )}
                             </tr>
                         ))}
                     </tbody>
@@ -679,15 +683,19 @@ export default function DashboardScreen() {
                 <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
                     <div className="flex items-center space-x-2 bg-white p-2 rounded-lg shadow-sm">
                         <NavButton label="Clientes" isActive={view === 'list' || view === 'form'} onClick={() => handleViewChange('list')} icon={<UsersIcon className="w-5 h-5" />} />
-                        <NavButton label="Mensajes" isActive={view === 'messages'} onClick={() => handleViewChange('messages')} icon={<InboxIcon className="w-5 h-5" />} />
+                        {currentUser?.role === UserRole.LEVEL_3 && (
+                            <NavButton label="Mensajes" isActive={view === 'messages'} onClick={() => handleViewChange('messages')} icon={<InboxIcon className="w-5 h-5" />} />
+                        )}
                         {currentUser?.role === UserRole.LEVEL_3 && (
                             <NavButton label="Usuarios" isActive={view === 'management'} onClick={() => handleViewChange('management')} icon={<UserCircleIcon className="w-5 h-5" />} />
                         )}
                     </div>
-                    <button onClick={handleAddNew} className="w-full sm:w-auto flex items-center justify-center bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 transition duration-300 shadow">
-                        <PlusIcon className="w-5 h-5 mr-2" />
-                        Registrar Cliente
-                    </button>
+                    {currentUser?.role === UserRole.LEVEL_3 && (
+                         <button onClick={handleAddNew} className="w-full sm:w-auto flex items-center justify-center bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 transition duration-300 shadow">
+                            <PlusIcon className="w-5 h-5 mr-2" />
+                            Registrar Cliente
+                        </button>
+                    )}
                 </div>
                 {renderMainContent()}
             </main>
