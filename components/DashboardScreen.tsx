@@ -51,10 +51,40 @@ const emptyClient: Omit<Client, 'id' | 'satStatus' | 'isActive'> = {
     }
 };
 
+const FileInput: React.FC<{
+    label: string;
+    name: string;
+    accept: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    currentFile?: string | null;
+    pendingFile?: File;
+    disabled?: boolean;
+}> = ({ label, name, accept, onChange, currentFile, pendingFile, disabled }) => (
+    <div className="space-y-1">
+        <label htmlFor={name} className="block text-sm font-medium text-slate-700">{label}</label>
+        <input
+            id={name}
+            name={name}
+            type="file"
+            accept={accept}
+            onChange={onChange}
+            className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 disabled:opacity-50"
+            disabled={disabled}
+        />
+        {(pendingFile || currentFile) && (
+            <p className="text-xs text-slate-500 mt-1">
+                {pendingFile ? `Nuevo: ${pendingFile.name}` : `Actual: ${currentFile}`}
+            </p>
+        )}
+    </div>
+);
+
 const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }> = ({ clientToEdit, onFinish }) => {
     const { addClient, updateClient, currentUser } = useAppContext();
     const isEditing = clientToEdit !== null;
     const [clientData, setClientData] = useState(isEditing ? clientToEdit : { ...emptyClient, satStatus: SatStatus.PENDIENTE, isActive: true });
+    const [pendingFiles, setPendingFiles] = useState<Record<string, File>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [error, setError] = useState('');
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -72,12 +102,20 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
         }
     };
     
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, files } = e.target;
+        if (files && files.length > 0) {
+            setPendingFiles(prev => ({ ...prev, [name]: files[0] }));
+        }
+    };
+    
     const handleSatStatusChange = async (newStatus: SatStatus) => {
         if (!clientToEdit || isUpdatingStatus || !canEdit) return;
         setIsUpdatingStatus(true);
         setStatusUpdateMsg('');
         const updatedClient: Client = { ...clientToEdit, satStatus: newStatus };
-        const result = await updateClient(updatedClient);
+        // We pass an empty files object as this is a separate action
+        const result = await updateClient(updatedClient, {});
         if (result.success) {
             setClientData(prevData => ({ ...prevData, satStatus: newStatus }));
             setStatusUpdateMsg('¡Estado actualizado!');
@@ -91,11 +129,12 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setIsSubmitting(true);
         let result: { success: boolean; reason?: string };
         if (isEditing && clientToEdit) {
-            result = await updateClient(clientData as Client);
+            result = await updateClient(clientData as Client, pendingFiles);
         } else {
-            result = await addClient(clientData);
+            result = await addClient(clientData, pendingFiles);
         }
         if (result.success) {
             setShowSuccess(true);
@@ -103,6 +142,7 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
         } else {
             setError(result.reason || 'Ocurrió un error inesperado.');
         }
+        setIsSubmitting(false);
     };
 
     const StatusPill: React.FC<{ status: SatStatus, interactive?: boolean, onClick?: (status: SatStatus) => void, current?: SatStatus, disabled?: boolean }> = ({ status, interactive, onClick, current, disabled }) => {
@@ -187,6 +227,26 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                                             <input name="email" type="email" value={clientData.email} onChange={handleChange} placeholder="Correo Electrónico" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
                                             <input name="phone" value={clientData.phone} onChange={handleChange} placeholder="Teléfono" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
                                             {!isEditing && <input name="password" type="password" value={clientData.password || ''} onChange={handleChange} placeholder="Contraseña para portal" required className="p-2 border rounded" />}
+                                            <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
+                                                <FileInput
+                                                    label="Firma Electrónica (e.firma) .zip"
+                                                    name="companyEFirma"
+                                                    accept=".zip"
+                                                    onChange={handleFileChange}
+                                                    currentFile={clientData.eFirma}
+                                                    pendingFile={pendingFiles.companyEFirma}
+                                                    disabled={isEditing && !canEdit}
+                                                />
+                                                <FileInput
+                                                    label="Constancia de Situación Fiscal .pdf"
+                                                    name="companyCsf"
+                                                    accept=".pdf"
+                                                    onChange={handleFileChange}
+                                                    currentFile={clientData.csf}
+                                                    pendingFile={pendingFiles.companyCsf}
+                                                    disabled={isEditing && !canEdit}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="p-4 border rounded-lg">
@@ -196,6 +256,26 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                                             <input name="paternalLastName" value={clientData.admin.paternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Paterno" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
                                             <input name="maternalLastName" value={clientData.admin.maternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Materno" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
                                             <input name="phone" value={clientData.admin.phone} onChange={e => handleChange(e, 'admin')} placeholder="Teléfono del contacto" required className="p-2 border rounded" disabled={isEditing && !canEdit} />
+                                            <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
+                                                <FileInput
+                                                    label="Firma Electrónica (e.firma) .zip"
+                                                    name="adminEFirma"
+                                                    accept=".zip"
+                                                    onChange={handleFileChange}
+                                                    currentFile={clientData.admin.eFirma}
+                                                    pendingFile={pendingFiles.adminEFirma}
+                                                    disabled={isEditing && !canEdit}
+                                                />
+                                                <FileInput
+                                                    label="Constancia de Situación Fiscal .pdf"
+                                                    name="adminCsf"
+                                                    accept=".pdf"
+                                                    onChange={handleFileChange}
+                                                    currentFile={clientData.admin.csf}
+                                                    pendingFile={pendingFiles.adminCsf}
+                                                    disabled={isEditing && !canEdit}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                     {isEditing && (
@@ -216,9 +296,9 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                             {isEditing && activeTab === 'tasks' && <TaskManager client={clientToEdit} />}
                         </div>
                         <div className="flex justify-end pt-6 mt-auto flex-shrink-0 border-t">
-                            {(!isEditing || activeTab === 'details') && (currentUser?.role === UserRole.LEVEL_3 || !isEditing) && (
-                              <button type="submit" form="client-details-form" className="bg-emerald-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-emerald-700 transition duration-300">
-                                  {isEditing ? 'Guardar Cambios' : 'Registrar Cliente'}
+                            {(!isEditing || activeTab === 'details') && (currentUser?.role === UserRole.LEVEL_3 || (currentUser?.role === UserRole.LEVEL_2 && !isEditing)) && (
+                              <button type="submit" form="client-details-form" disabled={isSubmitting} className="bg-emerald-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-emerald-700 transition duration-300 disabled:bg-slate-400">
+                                  {isSubmitting ? 'Guardando...' : (isEditing ? 'Guardar Cambios' : 'Registrar Cliente')}
                               </button>
                             )}
                         </div>

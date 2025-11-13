@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useCallback, useContext, createContext, useEffect } from 'react';
 import type { User, Client, Message, Task, Document } from './types';
 import { UserRole, SatStatus, TaskStatus } from './types';
@@ -83,6 +84,13 @@ const documentFromSupabase = (dbDoc: any): Document => ({
 
 type AdminUsersState = Record<string, { role: UserRole, isActive: boolean }>;
 
+type ClientFiles = {
+  companyEFirma?: File;
+  companyCsf?: File;
+  adminEFirma?: File;
+  adminCsf?: File;
+};
+
 interface AppContextType {
   currentUser: User | null;
   currentClient: Client | null;
@@ -96,8 +104,8 @@ interface AppContextType {
   login: (email: string, pass: string) => Promise<{ success: boolean, reason?: string }>;
   clientLogin: (email: string, pass: string) => Promise<{ success: boolean, reason?: string }>;
   logout: () => void;
-  addClient: (client: Omit<Client, 'id' | 'satStatus' | 'isActive'>) => Promise<{ success: boolean; reason?: string }>;
-  updateClient: (client: Client) => Promise<{ success: boolean; reason?: string }>;
+  addClient: (client: Omit<Client, 'id' | 'satStatus' | 'isActive'>, files: ClientFiles) => Promise<{ success: boolean; reason?: string }>;
+  updateClient: (client: Client, files: ClientFiles) => Promise<{ success: boolean; reason?: string }>;
   sendMessage: (clientId: string, content: string) => Promise<void>;
   toggleAdminStatus: (email: string) => Promise<void>;
   toggleClientStatus: (clientId: string) => Promise<void>;
@@ -289,7 +297,33 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setCurrentClient(null);
   }, []);
 
-  const addClient = useCallback(async (clientData: Omit<Client, 'id' | 'satStatus' | 'isActive'>): Promise<{ success: boolean; reason?: string }> => {
+  const uploadAndReplaceCredential = async (
+    clientId: string,
+    file: File,
+    oldFileName: string | undefined | null,
+    type: 'company_efirma' | 'company_csf' | 'admin_efirma' | 'admin_csf'
+  ) => {
+    if (oldFileName) {
+        const { error: removeError } = await supabase.storage
+            .from('client-files')
+            .remove([`${clientId}/credentials/${oldFileName}`]);
+        if (removeError) {
+            console.warn(`Could not remove old file: ${oldFileName}`, removeError);
+        }
+    }
+    const newFileName = `${type}-${Date.now()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+        .from('client-files')
+        .upload(`${clientId}/credentials/${newFileName}`, file);
+
+    if (uploadError) {
+        console.error('Upload error:', uploadError);
+        return { success: false, fileName: null, reason: 'Error al subir el archivo.' };
+    }
+    return { success: true, fileName: newFileName, reason: null };
+  };
+
+  const addClient = useCallback(async (clientData: Omit<Client, 'id' | 'satStatus' | 'isActive'>, files: ClientFiles): Promise<{ success: boolean; reason?: string }> => {
     if (clients.some(c => c.email.toLowerCase() === clientData.email.toLowerCase())) {
         return { success: false, reason: 'Ya existe un cliente con este correo electrónico.' };
     }
@@ -297,31 +331,98 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         return { success: false, reason: 'Este correo electrónico ya está en uso por un administrador.' };
     }
 
-    const supabaseClient = {
+    const initialSupabaseClient = {
         ...clientToSupabase(clientData),
         sat_status: SatStatus.PENDIENTE,
         is_active: true
     };
     
-    const { data, error } = await supabase.from('clients').insert(supabaseClient).select().single();
-    if (error) {
-        console.error("Error adding client:", error);
-        return { success: false, reason: 'Error en la base de datos.' };
+    const { data: newClientData, error: insertError } = await supabase.from('clients').insert(initialSupabaseClient).select().single();
+    if (insertError || !newClientData) {
+        console.error("Error adding client:", insertError);
+        return { success: false, reason: 'Error en la base de datos al crear cliente.' };
+    }
+    
+    const newClientId = newClientData.id;
+    const fileUpdates: Record<string, string> = {};
+    let uploadFailed = false;
+
+    if (files.companyEFirma) {
+        const result = await uploadAndReplaceCredential(newClientId, files.companyEFirma, null, 'company_efirma');
+        if (result.success) fileUpdates.e_firma_filename = result.fileName!; else uploadFailed = true;
+    }
+    if (files.companyCsf) {
+        const result = await uploadAndReplaceCredential(newClientId, files.companyCsf, null, 'company_csf');
+        if (result.success) fileUpdates.csf_filename = result.fileName!; else uploadFailed = true;
+    }
+    if (files.adminEFirma) {
+        const result = await uploadAndReplaceCredential(newClientId, files.adminEFirma, null, 'admin_efirma');
+        if (result.success) fileUpdates.contact_admin_e_firma_filename = result.fileName!; else uploadFailed = true;
+    }
+    if (files.adminCsf) {
+        const result = await uploadAndReplaceCredential(newClientId, files.adminCsf, null, 'admin_csf');
+        if (result.success) fileUpdates.contact_admin_csf_filename = result.fileName!; else uploadFailed = true;
+    }
+    
+    if (uploadFailed) {
+        await supabase.from('clients').delete().eq('id', newClientId);
+        return { success: false, reason: 'Falló la subida de uno o más archivos. Se canceló el registro.' };
     }
 
-    setClients(prevClients => [...prevClients, clientFromSupabase(data)]);
+    if (Object.keys(fileUpdates).length > 0) {
+        const { data: updatedClientData, error: updateError } = await supabase.from('clients').update(fileUpdates).eq('id', newClientId).select().single();
+        if (updateError) {
+            console.error("Error updating client with files:", updateError);
+            return { success: false, reason: 'No se pudieron guardar los nombres de los archivos.' };
+        }
+        setClients(prevClients => [...prevClients, clientFromSupabase(updatedClientData)]);
+    } else {
+        setClients(prevClients => [...prevClients, clientFromSupabase(newClientData)]);
+    }
+
     return { success: true };
   }, [clients, adminUsers]);
 
-  const updateClient = useCallback(async (updatedClient: Client): Promise<{ success: boolean; reason?: string }> => {
-    const supabaseClient = clientToSupabase(updatedClient);
-    const { data, error } = await supabase.from('clients').update(supabaseClient).eq('id', updatedClient.id).select().single();
+  const updateClient = useCallback(async (clientToUpdate: Client, files: ClientFiles): Promise<{ success: boolean; reason?: string }> => {
+    let clientWithNewFiles = JSON.parse(JSON.stringify(clientToUpdate));
+    let uploadFailed = false;
+    let uploadErrorReason = '';
+
+    const processUpload = async (fileKey: keyof ClientFiles, credentialType: 'company_efirma' | 'company_csf' | 'admin_efirma' | 'admin_csf', oldFileName: string | undefined | null, updatePath: string[]) => {
+        if (files[fileKey]) {
+            const result = await uploadAndReplaceCredential(clientToUpdate.id, files[fileKey]!, oldFileName, credentialType);
+            if (result.success) {
+                if(updatePath.length === 1) (clientWithNewFiles as any)[updatePath[0]] = result.fileName!;
+                else (clientWithNewFiles as any)[updatePath[0]][updatePath[1]] = result.fileName!;
+            } else {
+                uploadFailed = true;
+                uploadErrorReason = result.reason!;
+            }
+        }
+    };
+    
+    await processUpload('companyEFirma', 'company_efirma', clientToUpdate.eFirma, ['eFirma']);
+    if(uploadFailed) return { success: false, reason: uploadErrorReason };
+
+    await processUpload('companyCsf', 'company_csf', clientToUpdate.csf, ['csf']);
+    if(uploadFailed) return { success: false, reason: uploadErrorReason };
+
+    await processUpload('adminEFirma', 'admin_efirma', clientToUpdate.admin.eFirma, ['admin', 'eFirma']);
+    if(uploadFailed) return { success: false, reason: uploadErrorReason };
+
+    await processUpload('adminCsf', 'admin_csf', clientToUpdate.admin.csf, ['admin', 'csf']);
+    if(uploadFailed) return { success: false, reason: uploadErrorReason };
+    
+    const supabaseClient = clientToSupabase(clientWithNewFiles);
+    const { data, error } = await supabase.from('clients').update(supabaseClient).eq('id', clientToUpdate.id).select().single();
+    
     if (error) {
+        console.error("Error updating client:", error);
         return { success: false, reason: 'Error en la base de datos.' };
     }
-    setClients(prevClients => prevClients.map(c => c.id === updatedClient.id ? clientFromSupabase(data) : c));
+    setClients(prevClients => prevClients.map(c => c.id === clientToUpdate.id ? clientFromSupabase(data) : c));
     return { success: true };
-  }, []);
+}, []);
 
   const sendMessage = useCallback(async (clientId: string, content: string) => {
     const sender = currentUser ? 'admin' : 'client';
