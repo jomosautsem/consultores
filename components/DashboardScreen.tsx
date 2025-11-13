@@ -165,8 +165,12 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                             <div className="border-b border-slate-200 mb-6 flex-shrink-0">
                                 <nav className="-mb-px flex space-x-4">
                                     <TabButton label="Datos Generales" isActive={activeTab === 'details'} onClick={() => setActiveTab('details')} icon={<UserCircleIcon className="w-5 h-5"/>} />
-                                    <TabButton label="Documentos" isActive={activeTab === 'documents'} onClick={() => setActiveTab('documents')} icon={<DocumentDuplicateIcon className="w-5 h-5"/>} />
-                                    <TabButton label="Tareas" isActive={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} icon={<ClipboardDocumentListIcon className="w-5 h-5"/>} />
+                                    {(currentUser?.role === UserRole.LEVEL_2 || currentUser?.role === UserRole.LEVEL_3) && (
+                                        <>
+                                            <TabButton label="Documentos" isActive={activeTab === 'documents'} onClick={() => setActiveTab('documents')} icon={<DocumentDuplicateIcon className="w-5 h-5"/>} />
+                                            <TabButton label="Tareas" isActive={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} icon={<ClipboardDocumentListIcon className="w-5 h-5"/>} />
+                                        </>
+                                    )}
                                 </nav>
                             </div>
                         )}
