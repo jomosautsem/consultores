@@ -690,7 +690,7 @@ export default function DashboardScreen() {
                             <NavButton label="Usuarios" isActive={view === 'management'} onClick={() => handleViewChange('management')} icon={<UserCircleIcon className="w-5 h-5" />} />
                         )}
                     </div>
-                    {currentUser?.role === UserRole.LEVEL_3 && (
+                    {(currentUser?.role === UserRole.LEVEL_3 || currentUser?.role === UserRole.LEVEL_2) && (
                          <button onClick={handleAddNew} className="w-full sm:w-auto flex items-center justify-center bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 transition duration-300 shadow">
                             <PlusIcon className="w-5 h-5 mr-2" />
                             Registrar Cliente
