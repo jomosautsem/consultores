@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useContext, createContext, useEffect } from 'react';
 import type { User, Client, Message, Task, Document } from './types';
 import { UserRole, SatStatus, TaskStatus } from './types';
@@ -274,9 +275,28 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }, []);
 
   const addClient = useCallback(async (clientData: Omit<Client, 'id' | 'satStatus' | 'isActive'>): Promise<{ success: boolean; reason?: string }> => {
-    // ... (existing implementation)
+    if (clients.some(c => c.email.toLowerCase() === clientData.email.toLowerCase())) {
+        return { success: false, reason: 'Ya existe un cliente con este correo electrónico.' };
+    }
+    if (adminUsers[clientData.email]) {
+        return { success: false, reason: 'Este correo electrónico ya está en uso por un administrador.' };
+    }
+
+    const supabaseClient = {
+        ...clientToSupabase(clientData),
+        sat_status: SatStatus.PENDIENTE,
+        is_active: true
+    };
+    
+    const { data, error } = await supabase.from('clients').insert(supabaseClient).select().single();
+    if (error) {
+        console.error("Error adding client:", error);
+        return { success: false, reason: 'Error en la base de datos.' };
+    }
+
+    setClients(prevClients => [...prevClients, clientFromSupabase(data)]);
     return { success: true };
-  }, []);
+  }, [clients, adminUsers]);
 
   const updateClient = useCallback(async (updatedClient: Client): Promise<{ success: boolean; reason?: string }> => {
     const supabaseClient = clientToSupabase(updatedClient);
@@ -289,19 +309,82 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }, []);
 
   const sendMessage = useCallback(async (clientId: string, content: string) => {
-    // ... (existing implementation)
-  }, []);
+    const sender = currentUser ? 'admin' : 'client';
+    if (!content.trim()) return;
+
+    const { error } = await supabase.from('messages').insert({
+        client_id: clientId,
+        content: content,
+        sender: sender,
+    });
+    if (error) {
+        console.error("Error sending message:", error);
+    }
+  }, [currentUser]);
 
   const toggleAdminStatus = useCallback(async (email: string) => {
-    // ... (existing implementation)
+    const userToToggle = adminUsers[email];
+    if (!userToToggle) return;
+    const newStatus = !userToToggle.isActive;
+
+    const { error } = await supabase.from('administrators').update({ is_active: newStatus }).eq('email', email);
+
+    if (error) {
+        console.error("Error toggling admin status:", error);
+        return;
+    }
+    setAdminUsers(prev => ({
+        ...prev,
+        [email]: { ...prev[email], isActive: newStatus }
+    }));
   }, [adminUsers]);
 
   const toggleClientStatus = useCallback(async (clientId: string) => {
-    // ... (existing implementation)
+    const clientToToggle = clients.find(c => c.id === clientId);
+    if (!clientToToggle) return;
+    const newStatus = !clientToToggle.isActive;
+
+    const { error } = await supabase.from('clients').update({ is_active: newStatus }).eq('id', clientId);
+
+    if (error) {
+        console.error("Error toggling client status:", error);
+        return;
+    }
+
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, isActive: newStatus } : c));
   }, [clients]);
 
   const addAdminUser = useCallback(async (email: string, role: UserRole, password: string): Promise<{ success: boolean; reason?: string }> => {
-    // ... (existing implementation)
+    if (adminUsers[email]) {
+        return { success: false, reason: 'Ya existe un administrador con este correo electrónico.' };
+    }
+    if (clients.some(client => client.email.toLowerCase() === email.toLowerCase())) {
+        return { success: false, reason: 'Este correo electrónico ya está en uso por un cliente.' };
+    }
+
+    const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+    });
+
+    if (signUpError) {
+        console.error("Error signing up new admin:", signUpError);
+        return { success: false, reason: signUpError.message };
+    }
+    if (!user) {
+        return { success: false, reason: "No se pudo crear el usuario en el sistema de autenticación."}
+    }
+
+    const { error: insertError } = await supabase
+        .from('administrators')
+        .insert({ user_id: user.id, email: email, role: role, is_active: true });
+
+    if (insertError) {
+        console.error("Error inserting new admin into profiles:", insertError);
+        return { success: false, reason: "No se pudo guardar el perfil del administrador." };
+    }
+
+    setAdminUsers(prev => ({...prev, [email]: { role, isActive: true }}));
     return { success: true };
   }, [adminUsers, clients]);
 

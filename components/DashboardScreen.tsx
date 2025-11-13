@@ -1,9 +1,11 @@
 
 
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../App';
 import { UserRole, Client, SatStatus, Message, Task, Document, TaskStatus, DocumentFolder } from '../types';
-import { LogoutIcon, UserCircleIcon, BuildingOfficeIcon, PlusIcon, XMarkIcon, InboxIcon, UsersIcon, ClipboardDocumentListIcon, DocumentDuplicateIcon } from './ui/Icons';
+// Fix: Imported PaperAirplaneIcon.
+import { LogoutIcon, UserCircleIcon, BuildingOfficeIcon, PlusIcon, XMarkIcon, InboxIcon, UsersIcon, ClipboardDocumentListIcon, DocumentDuplicateIcon, PaperAirplaneIcon } from './ui/Icons';
 import { supabase } from '../supabaseClient';
 
 
@@ -73,8 +75,6 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
         }
     };
     
-    // Omitted file change handlers for brevity as they are now managed in DocumentManager
-    
     const handleSatStatusChange = async (newStatus: SatStatus) => {
         if (!clientToEdit || isUpdatingStatus || !canEdit) return;
         setIsUpdatingStatus(true);
@@ -94,7 +94,6 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        // Validation logic remains, but file validation would now check for File objects if implemented.
         let result: { success: boolean; reason?: string };
         if (isEditing && clientToEdit) {
             result = await updateClient(clientData as Client);
@@ -110,8 +109,29 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
     };
 
     const StatusPill: React.FC<{ status: SatStatus, interactive?: boolean, onClick?: (status: SatStatus) => void, current?: SatStatus, disabled?: boolean }> = ({ status, interactive, onClick, current, disabled }) => {
-        // ... (existing implementation)
-        return <button/>;
+        const baseClasses = "px-3 py-1 text-xs font-bold rounded-full transition-all duration-200";
+        const statusColors: Record<SatStatus, string> = {
+            [SatStatus.AL_CORRIENTE]: 'bg-emerald-100 text-emerald-800',
+            [SatStatus.CON_ADEUDOS]: 'bg-red-100 text-red-800',
+            [SatStatus.EN_REVISION]: 'bg-yellow-100 text-yellow-800',
+            [SatStatus.PENDIENTE]: 'bg-slate-200 text-slate-800',
+        };
+        
+        if (interactive && onClick) {
+            const isSelected = status === current;
+            return (
+                <button
+                    type="button"
+                    onClick={() => onClick(status)}
+                    disabled={disabled}
+                    className={`${baseClasses} ${statusColors[status]} ${isSelected ? 'ring-2 ring-offset-1 ring-emerald-500' : 'opacity-60 hover:opacity-100'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                    {status}
+                </button>
+            );
+        }
+        
+        return <span className={`${baseClasses} ${statusColors[status]}`}>{status}</span>;
     };
     
     const TabButton: React.FC<{ label: string; isActive: boolean; onClick: () => void, icon: React.ReactNode }> = ({ label, isActive, onClick, icon }) => (
@@ -138,7 +158,9 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                 </div>
                 {showSuccess ? (
                      <div className="text-center p-8 flex-grow flex flex-col justify-center">
-                        {/* ... Success Message ... */}
+                        <svg className="w-16 h-16 text-emerald-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <h3 className="text-2xl font-bold text-slate-800">¡Éxito!</h3>
+                        <p className="text-slate-600 mt-2">Los datos del cliente se han {isEditing ? 'actualizado' : 'registrado'} correctamente.</p>
                     </div>
                 ) : (
                     <>
@@ -153,16 +175,47 @@ const ClientForm: React.FC<{ clientToEdit: Client | null, onFinish: () => void }
                         )}
                         <div className="overflow-y-auto pr-4 flex-grow">
                             {(!isEditing || activeTab === 'details') && (
-                                <form onSubmit={handleSubmit} id="client-details-form">
-                                  {/* --- All the input fields from the original form go here --- */}
-                                  {/* This includes Datos de la Empresa, SAT Status, Documentos Fiscales, Datos del Administrador */}
+                                <form onSubmit={handleSubmit} id="client-details-form" className="space-y-6">
+                                    <div className="p-4 border rounded-lg">
+                                        <h4 className="font-semibold text-slate-700 mb-3">Datos de la Empresa</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <input name="companyName" value={clientData.companyName} onChange={handleChange} placeholder="Nombre Comercial" required className="p-2 border rounded" />
+                                            <input name="legalName" value={clientData.legalName} onChange={handleChange} placeholder="Razón Social" required className="p-2 border rounded" />
+                                            <input name="rfc" value={clientData.rfc} onChange={handleChange} placeholder="RFC" required className="p-2 border rounded" />
+                                            <input name="location" value={clientData.location} onChange={handleChange} placeholder="Ubicación (Ciudad, Estado)" required className="p-2 border rounded" />
+                                            <input name="email" type="email" value={clientData.email} onChange={handleChange} placeholder="Correo Electrónico" required className="p-2 border rounded" />
+                                            <input name="phone" value={clientData.phone} onChange={handleChange} placeholder="Teléfono" required className="p-2 border rounded" />
+                                            {!isEditing && <input name="password" type="password" value={clientData.password || ''} onChange={handleChange} placeholder="Contraseña para portal" required className="p-2 border rounded" />}
+                                        </div>
+                                    </div>
+                                    <div className="p-4 border rounded-lg">
+                                        <h4 className="font-semibold text-slate-700 mb-3">Datos del Administrador/Contacto</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <input name="firstName" value={clientData.admin.firstName} onChange={e => handleChange(e, 'admin')} placeholder="Nombres" required className="p-2 border rounded" />
+                                            <input name="paternalLastName" value={clientData.admin.paternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Paterno" required className="p-2 border rounded" />
+                                            <input name="maternalLastName" value={clientData.admin.maternalLastName} onChange={e => handleChange(e, 'admin')} placeholder="Apellido Materno" required className="p-2 border rounded" />
+                                            <input name="phone" value={clientData.admin.phone} onChange={e => handleChange(e, 'admin')} placeholder="Teléfono del contacto" required className="p-2 border rounded" />
+                                        </div>
+                                    </div>
+                                    {isEditing && (
+                                        <div className="p-4 border rounded-lg">
+                                            <h4 className="font-semibold text-slate-700 mb-3">Estado de Obligaciones (SAT)</h4>
+                                            <div className="flex items-center space-x-2">
+                                                {Object.values(SatStatus).map(status => (
+                                                    <StatusPill key={status} status={status} interactive onClick={handleSatStatusChange} current={clientData.satStatus} disabled={!canEdit || isUpdatingStatus} />
+                                                ))}
+                                            </div>
+                                            {statusUpdateMsg && <p className="text-sm text-emerald-600 mt-2">{statusUpdateMsg}</p>}
+                                        </div>
+                                    )}
+                                    {error && <p className="text-red-500 text-sm">{error}</p>}
                                 </form>
                             )}
                             {isEditing && activeTab === 'documents' && <DocumentManager client={clientToEdit} />}
                             {isEditing && activeTab === 'tasks' && <TaskManager client={clientToEdit} />}
                         </div>
                         <div className="flex justify-end pt-6 mt-auto flex-shrink-0 border-t">
-                            {(currentUser?.role === UserRole.LEVEL_3 || !isEditing) && (
+                            {(!isEditing || activeTab === 'details') && (currentUser?.role === UserRole.LEVEL_3 || !isEditing) && (
                               <button type="submit" form="client-details-form" className="bg-emerald-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-emerald-700 transition duration-300">
                                   {isEditing ? 'Guardar Cambios' : 'Registrar Cliente'}
                               </button>
@@ -328,19 +381,204 @@ const TaskManager: React.FC<{ client: Client }> = ({ client }) => {
 
 
 const ClientList: React.FC<{ onSelectClient: (client: Client) => void }> = ({ onSelectClient }) => {
-    // ... (existing implementation)
-    return <div/>;
+    const { clients, loading } = useAppContext();
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredClients = useMemo(() => {
+        return clients.filter(client =>
+            client.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            client.legalName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            client.rfc.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [clients, searchTerm]);
+
+    if (loading) return <div className="text-center p-8">Cargando clientes...</div>;
+
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+            <div className="mb-4">
+                <input
+                    type="text"
+                    placeholder="Buscar cliente por nombre o RFC..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                    <thead>
+                        <tr className="bg-slate-50 border-b">
+                            <th className="p-3 font-semibold text-slate-600">Empresa</th>
+                            <th className="p-3 font-semibold text-slate-600">RFC</th>
+                            <th className="p-3 font-semibold text-slate-600">Estado SAT</th>
+                            <th className="p-3 font-semibold text-slate-600">Estado</th>
+                            <th className="p-3 font-semibold text-slate-600">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredClients.map(client => (
+                            <tr key={client.id} className="border-b hover:bg-slate-50">
+                                <td className="p-3 font-medium text-slate-800">{client.companyName}</td>
+                                <td className="p-3 text-slate-600">{client.rfc}</td>
+                                <td className="p-3 text-slate-600">{client.satStatus}</td>
+                                <td className="p-3"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${client.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{client.isActive ? 'Activo' : 'Inactivo'}</span></td>
+                                <td className="p-3">
+                                    <button onClick={() => onSelectClient(client)} className="text-emerald-600 hover:underline font-semibold">Ver Detalles</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                 {filteredClients.length === 0 && <p className="text-center text-slate-500 py-8">No se encontraron clientes.</p>}
+            </div>
+        </div>
+    );
 };
 
 const MessagesInbox: React.FC = () => {
-    // ... (existing implementation)
-    return <div/>;
+    const { messages, clients, sendMessage } = useAppContext();
+    const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+    const [newMessage, setNewMessage] = useState('');
+    const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+    const messagesByClient = useMemo(() => {
+        return messages.reduce((acc, msg) => {
+            (acc[msg.clientId] = acc[msg.clientId] || []).push(msg);
+            return acc;
+        }, {} as Record<string, Message[]>);
+    }, [messages]);
+
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (selectedClientId && newMessage.trim()) {
+            await sendMessage(selectedClientId, newMessage);
+            setNewMessage('');
+        }
+    };
+
+    React.useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages, selectedClientId]);
+
+    const selectedClient = clients.find(c => c.id === selectedClientId);
+    const selectedMessages = selectedClientId ? messagesByClient[selectedClientId] || [] : [];
+
+    return (
+        <div className="bg-white rounded-lg shadow-lg flex h-[75vh]">
+            <div className="w-full md:w-1/3 border-r border-slate-200 flex flex-col">
+                <h3 className="text-lg font-bold p-4 border-b border-slate-200">Conversaciones</h3>
+                <ul className="overflow-y-auto flex-grow">
+                    {clients.map(client => (
+                        <li key={client.id} onClick={() => setSelectedClientId(client.id)}
+                            className={`p-3 cursor-pointer border-l-4 ${selectedClientId === client.id ? 'bg-emerald-50 border-emerald-500' : 'border-transparent hover:bg-slate-50'}`}>
+                            {client.companyName}
+                        </li>
+                    ))}
+                </ul>
+            </div>
+            <div className="w-full md:w-2/3 flex flex-col">
+                {selectedClient ? (
+                    <>
+                        <h3 className="text-lg font-bold p-4 border-b border-slate-200">{selectedClient.companyName}</h3>
+                        <div className="flex-grow overflow-y-auto mb-4 p-4 space-y-4 bg-slate-50">
+                            {selectedMessages.map(msg => (
+                                <div key={msg.id} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`p-3 rounded-lg max-w-sm shadow-sm ${msg.sender === 'admin' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-800'}`}>
+                                        <p>{msg.content}</p>
+                                        <p className="text-xs opacity-75 mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString()}</p>
+                                    </div>
+                                </div>
+                            ))}
+                             <div ref={messagesEndRef} />
+                        </div>
+                        <form onSubmit={handleSendMessage} className="flex space-x-2 p-4 border-t border-slate-200">
+                            <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} className="flex-grow p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Escribe un mensaje..." />
+                            <button type="submit" className="bg-emerald-600 text-white p-3 rounded-lg hover:bg-emerald-700 flex-shrink-0"><PaperAirplaneIcon className="w-5 h-5"/></button>
+                        </form>
+                    </>
+                ) : (
+                    <div className="flex items-center justify-center h-full text-slate-500">
+                        <p>Selecciona una conversación para ver los mensajes.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 };
 
 const UserManagement: React.FC = () => {
-    // ... (existing implementation)
-    return <div/>;
+    const { adminUsers, addAdminUser, toggleAdminStatus } = useAppContext();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [role, setRole] = useState<UserRole>(UserRole.LEVEL_1);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+
+    const handleAddUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setSuccess('');
+        if (!email.trim() || !password.trim()) {
+            setError('Correo y contraseña son requeridos.');
+            return;
+        }
+        const result = await addAdminUser(email, role, password);
+        if (result.success) {
+            setSuccess('Usuario administrador añadido con éxito.');
+            setEmail('');
+            setPassword('');
+            setRole(UserRole.LEVEL_1);
+        } else {
+            setError(result.reason || 'No se pudo añadir el usuario.');
+        }
+    };
+    
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+            <h3 className="text-xl font-bold mb-6 border-b pb-3">Gestionar Administradores</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-slate-50 p-6 rounded-lg">
+                    <h4 className="font-semibold mb-4 text-slate-700">Añadir Nuevo Administrador</h4>
+                    <form onSubmit={handleAddUser} className="space-y-4">
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Correo electrónico" className="w-full p-2 border rounded" required />
+                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" className="w-full p-2 border rounded" required />
+                        <select value={role} onChange={e => setRole(e.target.value as UserRole)} className="w-full p-2 border rounded">
+                            <option value={UserRole.LEVEL_1}>Nivel 1 (Ver)</option>
+                            <option value={UserRole.LEVEL_2}>Nivel 2 (Ver/Editar)</option>
+                            <option value={UserRole.LEVEL_3}>Nivel 3 (Total)</option>
+                        </select>
+                        <button type="submit" className="w-full bg-emerald-600 text-white p-2 rounded hover:bg-emerald-700 font-bold">Añadir Usuario</button>
+                        {error && <p className="text-red-500 text-sm">{error}</p>}
+                        {success && <p className="text-green-500 text-sm">{success}</p>}
+                    </form>
+                </div>
+                <div>
+                    <h4 className="font-semibold mb-4 text-slate-700">Administradores Actuales</h4>
+                    <ul className="space-y-2 max-h-96 overflow-y-auto">
+                        {/* Fix: Changed from Object.entries to Object.keys to avoid type inference issues. */}
+                        {Object.keys(adminUsers).map((email) => {
+                            const user = adminUsers[email];
+                            return (
+                                <li key={email} className="p-3 bg-white border rounded-lg flex justify-between items-center">
+                                    <div>
+                                        <p className="font-medium text-slate-800">{email}</p>
+                                        <p className="text-sm text-slate-500">Rol: {user.role.replace('_', ' ')}</p>
+                                    </div>
+                                    <button onClick={() => toggleAdminStatus(email)}
+                                        className={`px-3 py-1 text-xs font-semibold rounded-full ${user.isActive ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
+                                        {user.isActive ? 'Activo' : 'Inactivo'}
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    );
 };
+
 
 export default function DashboardScreen() {
     const { currentUser } = useAppContext();
@@ -366,16 +604,46 @@ export default function DashboardScreen() {
         setView(newView);
     };
 
+    const NavButton: React.FC<{label: string; isActive: boolean; onClick: () => void; icon: React.ReactNode;}> = ({ label, isActive, onClick, icon }) => (
+        <button onClick={onClick} className={`flex items-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 ${isActive ? 'bg-emerald-600 text-white shadow' : 'text-slate-600 hover:bg-slate-200'}`}>
+            {icon}
+            <span>{label}</span>
+        </button>
+    );
+
     const renderMainContent = () => {
         switch (view) {
+            case 'messages':
+                return <MessagesInbox />;
+            case 'management':
+                return currentUser?.role === UserRole.LEVEL_3 ? <UserManagement /> : <ClientList onSelectClient={handleSelectClient} />;
+            case 'list':
             case 'form':
-                return <ClientForm clientToEdit={selectedClient} onFinish={handleFormFinish} />;
-            // other cases remain the same
             default:
                  return <ClientList onSelectClient={handleSelectClient} />;
         }
     };
-    
-    // ... (rest of the component, JSX for header and buttons remains largely the same)
-    return <div/>
+
+    return (
+        <div className="min-h-screen bg-slate-100">
+            <Header />
+            <main className="container mx-auto p-4 sm:p-6 lg:p-8">
+                <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
+                    <div className="flex items-center space-x-2 bg-white p-2 rounded-lg shadow-sm">
+                        <NavButton label="Clientes" isActive={view === 'list' || view === 'form'} onClick={() => handleViewChange('list')} icon={<UsersIcon className="w-5 h-5" />} />
+                        <NavButton label="Mensajes" isActive={view === 'messages'} onClick={() => handleViewChange('messages')} icon={<InboxIcon className="w-5 h-5" />} />
+                        {currentUser?.role === UserRole.LEVEL_3 && (
+                            <NavButton label="Usuarios" isActive={view === 'management'} onClick={() => handleViewChange('management')} icon={<UserCircleIcon className="w-5 h-5" />} />
+                        )}
+                    </div>
+                    <button onClick={handleAddNew} className="w-full sm:w-auto flex items-center justify-center bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 transition duration-300 shadow">
+                        <PlusIcon className="w-5 h-5 mr-2" />
+                        Registrar Cliente
+                    </button>
+                </div>
+                {renderMainContent()}
+            </main>
+            {view === 'form' && <ClientForm clientToEdit={selectedClient} onFinish={handleFormFinish} />}
+        </div>
+    );
 }
