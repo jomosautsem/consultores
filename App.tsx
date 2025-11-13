@@ -377,6 +377,24 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         setClients(prevClients => [...prevClients, clientFromSupabase(newClientData)]);
     }
 
+    // --- Send Welcome Email via Edge Function ---
+    try {
+        const { error: functionError } = await supabase.functions.invoke('send-welcome-email', {
+          body: {
+            clientName: clientData.admin.firstName,
+            clientEmail: clientData.email,
+            clientPassword: clientData.password,
+            companyName: clientData.companyName,
+          },
+        });
+        if (functionError) throw functionError;
+        console.log("Función de correo de bienvenida invocada exitosamente.");
+      } catch (error) {
+        // Error no crítico: Registrarlo pero no fallar el proceso de creación del cliente.
+        console.error("Falló la invocación de la función de correo de bienvenida:", error);
+      }
+    // --- End Email Sending ---
+
     return { success: true };
   }, [clients, adminUsers]);
 
