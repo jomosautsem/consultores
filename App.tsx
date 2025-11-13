@@ -37,7 +37,6 @@ const clientToSupabase = (client: Omit<Client, 'id' | 'satStatus' | 'isActive'> 
     email: client.email,
     phone: client.phone,
     rfc: client.rfc,
-    // Reverted to use null for better data representation now that the DB schema is updated.
     e_firma_filename: client.eFirma || null,
     csf_filename: client.csf || null,
     password: client.password,
