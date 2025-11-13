@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useCallback, useContext, createContext, useEffect } from 'react';
 import type { User, Client, Message, Task, Document } from './types';
 import { UserRole, SatStatus, TaskStatus } from './types';
@@ -40,15 +37,15 @@ const clientToSupabase = (client: Omit<Client, 'id' | 'satStatus' | 'isActive'> 
     email: client.email,
     phone: client.phone,
     rfc: client.rfc,
-    e_firma_filename: client.eFirma,
-    csf_filename: client.csf,
+    e_firma_filename: client.eFirma || null,
+    csf_filename: client.csf || null,
     password: client.password,
     contact_admin_first_name: client.admin.firstName,
     contact_admin_paternal_last_name: client.admin.paternalLastName,
     contact_admin_maternal_last_name: client.admin.maternalLastName,
     contact_admin_phone: client.admin.phone,
-    contact_admin_e_firma_filename: client.admin.eFirma,
-    contact_admin_csf_filename: client.admin.csf,
+    contact_admin_e_firma_filename: client.admin.eFirma || null,
+    contact_admin_csf_filename: client.admin.csf || null,
     ...('satStatus' in client && { sat_status: client.satStatus }),
     ...('isActive' in client && { is_active: client.isActive }),
 });
