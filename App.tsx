@@ -37,15 +37,17 @@ const clientToSupabase = (client: Omit<Client, 'id' | 'satStatus' | 'isActive'> 
     email: client.email,
     phone: client.phone,
     rfc: client.rfc,
-    e_firma_filename: client.eFirma || null,
-    csf_filename: client.csf || null,
+    // FIX: Use ?? '' to ensure an empty string is sent instead of null for empty/undefined values.
+    // This complies with a likely NOT NULL constraint in the database.
+    e_firma_filename: client.eFirma ?? '',
+    csf_filename: client.csf ?? '',
     password: client.password,
     contact_admin_first_name: client.admin.firstName,
     contact_admin_paternal_last_name: client.admin.paternalLastName,
     contact_admin_maternal_last_name: client.admin.maternalLastName,
     contact_admin_phone: client.admin.phone,
-    contact_admin_e_firma_filename: client.admin.eFirma || null,
-    contact_admin_csf_filename: client.admin.csf || null,
+    contact_admin_e_firma_filename: client.admin.eFirma ?? '',
+    contact_admin_csf_filename: client.admin.csf ?? '',
     ...('satStatus' in client && { sat_status: client.satStatus }),
     ...('isActive' in client && { is_active: client.isActive }),
 });
